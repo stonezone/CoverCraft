@@ -196,7 +196,7 @@ jobs:
       uses: actions/checkout@v4
     
     - name: 📊 Download Test Results
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         pattern: test-results-*
         merge-multiple: true
