@@ -4,6 +4,10 @@
 import Foundation
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Immutable data transfer object representing a cover panel
 /// 
 /// This DTO is designed for stable serialization and transfer between modules.
@@ -133,6 +137,7 @@ public extension ColorDTO {
     static func from(swiftUIColor color: Color) -> ColorDTO {
         // Note: This is a simplified conversion
         // In practice, you might need more sophisticated color extraction
+        #if canImport(UIKit)
         let uiColor = UIColor(color)
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -147,5 +152,9 @@ public extension ColorDTO {
             blue: Double(blue),
             alpha: Double(alpha)
         )
+        #else
+        // Fallback for platforms without UIKit
+        return ColorDTO(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+        #endif
     }
 }

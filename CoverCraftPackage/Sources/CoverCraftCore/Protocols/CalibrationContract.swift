@@ -2,6 +2,7 @@
 // Protocol contracts for calibration operations
 
 import Foundation
+import CoverCraftDTO
 import simd
 
 /// Contract for calibration data management
@@ -33,6 +34,7 @@ public protocol CalibrationContract: AnyObject, Sendable {
 }
 
 /// Contract for AR-based calibration operations
+@available(iOS 18.0, macOS 10.15, *)
 public protocol ARCalibrationContract: Actor {
     /// Perform hit test to find mesh intersection point
     /// - Parameters:
@@ -52,26 +54,4 @@ public protocol ARCalibrationContract: Actor {
     ) async -> Bool
 }
 
-/// Errors that can occur during calibration
-public enum CalibrationError: LocalizedError, Sendable {
-    case invalidPoint
-    case pointsTooClose
-    case invalidDistance
-    case calibrationIncomplete
-    case hitTestFailed
-    
-    public var errorDescription: String? {
-        switch self {
-        case .invalidPoint:
-            return "Calibration point is invalid or outside mesh bounds"
-        case .pointsTooClose:
-            return "Calibration points are too close together"
-        case .invalidDistance:
-            return "Real-world distance must be positive"
-        case .calibrationIncomplete:
-            return "Calibration requires two points and real-world distance"
-        case .hitTestFailed:
-            return "Failed to find intersection with mesh surface"
-        }
-    }
-}
+// CalibrationError is defined in CoverCraftErrors.swift

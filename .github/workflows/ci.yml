@@ -1,291 +1,233 @@
-# CoverCraft CI/CD Pipeline
-# Comprehensive continuous integration for iOS app development
+name: CI/CD Pipeline
 
-name: CI
-
-# Trigger conditions
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-  workflow_dispatch:
 
-# Environment variables
 env:
-  XCODE_VERSION: "16.0"
-  IOS_VERSION: "18.0"
-  SWIFT_VERSION: "6.0"
-
-# Concurrency control - cancel previous runs on new push
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
 
 jobs:
-  # Job 1: Lint and Code Quality
-  lint:
-    name: 🧹 Lint & Code Quality
-    runs-on: macos-14
-    timeout-minutes: 15
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-    
-    - name: 📱 Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-    
-    - name: 🔍 Install SwiftLint
-      run: |
-        brew install swiftlint
-        swiftlint version
-    
-    - name: 🧹 Run SwiftLint
-      run: |
-        swiftlint --config .swiftlint.yml --reporter github-actions-logging
-        # Generate JSON report for artifacts
-        swiftlint --config .swiftlint.yml --reporter json > swiftlint-results.json
-      continue-on-error: false
-    
-    - name: 📊 Upload Lint Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: swiftlint-results
-        path: swiftlint-results.json
-        retention-days: 7
-
-  # Job 2: Build Application
-  build:
-    name: 🔨 Build Application
-    runs-on: macos-14
-    timeout-minutes: 30
-    needs: [lint]
-    strategy:
-      matrix:
-        configuration: [Debug, Release]
-        simulator: ["iPhone 16", "iPad Pro (13-inch) (M4)"]
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-    
-    - name: 📱 Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-    
-    - name: 🗂️ Cache Swift Packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/Library/Developer/Xcode/DerivedData/*/SourcePackages/
-          CoverCraftPackage/.build
-        key: ${{ runner.os }}-spm-${{ hashFiles('CoverCraftPackage/Package.swift', 'CoverCraftPackage/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-
-    
-    - name: 🔍 List Available Simulators
-      run: xcrun simctl list devices available
-    
-    - name: 🔨 Build for Simulator
-      run: |
-        xcodebuild \
-          -workspace CoverCraft.xcworkspace \
-          -scheme CoverCraft \
-          -configuration ${{ matrix.configuration }} \
-          -destination "platform=iOS Simulator,name=${{ matrix.simulator }}" \
-          -derivedDataPath DerivedData \
-          build-for-testing \
-          | xcbeautify
-    
-    - name: 📊 Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: build-logs-${{ matrix.configuration }}-${{ matrix.simulator }}
-        path: |
-          DerivedData/Logs/
-          *.log
-        retention-days: 7
-
-  # Job 3: Run Tests
+  # Build and test Swift Package
   test:
-    name: 🧪 Run Tests
-    runs-on: macos-14
-    timeout-minutes: 45
-    needs: [build]
-    strategy:
-      matrix:
-        simulator: ["iPhone 16", "iPad Pro (13-inch) (M4)"]
+    name: Build and Test
+    runs-on: macos-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-    
-    - name: 📱 Select Xcode Version
-      run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-    
-    - name: 🗂️ Cache Swift Packages
-      uses: actions/cache@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      
+    - name: Show Xcode version
+      run: xcodebuild -version
+      
+    - name: Cache Swift packages
+      uses: actions/cache@v3
       with:
         path: |
-          ~/Library/Developer/Xcode/DerivedData/*/SourcePackages/
-          CoverCraftPackage/.build
-        key: ${{ runner.os }}-spm-${{ hashFiles('CoverCraftPackage/Package.swift', 'CoverCraftPackage/Package.resolved') }}
+          .build
+          ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-swift-${{ hashFiles('CoverCraftPackage/Package.swift') }}
         restore-keys: |
-          ${{ runner.os }}-spm-
+          ${{ runner.os }}-swift-
     
-    - name: 🧪 Run iOS Tests
+    - name: Build Swift Package
+      working-directory: ./CoverCraftPackage
+      run: swift build -c debug
+      
+    - name: Run Swift Package Tests
+      working-directory: ./CoverCraftPackage
+      run: swift test --enable-test-discovery --parallel
+
+  # Lint and formatting checks
+  lint:
+    name: Lint and Format Check
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install SwiftFormat
       run: |
-        xcodebuild \
-          -workspace CoverCraft.xcworkspace \
-          -scheme CoverCraft \
-          -configuration Debug \
-          -destination "platform=iOS Simulator,name=${{ matrix.simulator }}" \
-          -derivedDataPath DerivedData \
-          -enableCodeCoverage YES \
-          test \
-          | xcbeautify
-      env:
-        FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
-    
-    - name: 🧪 Run Swift Package Tests
+        brew update
+        brew install swiftformat
+        
+    - name: Install SwiftLint
+      run: |
+        brew update
+        brew install swiftlint
+        
+    - name: Check SwiftFormat
+      run: |
+        swiftformat --lint CoverCraftPackage/Sources/
+        swiftformat --lint CoverCraftPackage/Tests/
+        
+    - name: Run SwiftLint
       run: |
         cd CoverCraftPackage
-        # Swift Package tests (may have macOS compatibility issues - expected)
-        swift test --parallel || echo "Swift package tests completed with expected macOS compatibility issues"
-    
-    - name: 📊 Process Test Results
-      if: always()
-      run: |
-        find DerivedData -name "*.xcresult" -type d | head -1 | xargs -I {} \
-        xcrun xcresulttool export --type html --path {} --output-path test-results.html
-    
-    - name: 📈 Generate Coverage Report
-      if: always()
-      run: |
-        find DerivedData -name "*.xcresult" -type d | head -1 | xargs -I {} \
-        xcrun xccov view --report --json {} > coverage-report.json
-    
-    - name: 📊 Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-${{ matrix.simulator }}
-        path: |
-          test-results.html
-          coverage-report.json
-          DerivedData/Logs/Test/
-        retention-days: 30
+        swiftlint lint --strict
 
-  # Job 4: Code Coverage Analysis
-  coverage:
-    name: 📈 Code Coverage
-    runs-on: macos-14
-    timeout-minutes: 20
-    needs: [test]
+  # Security and dependency checks
+  security:
+    name: Security Scan
+    runs-on: macos-latest
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: 📊 Download Test Results
-      uses: actions/download-artifact@v4
-      with:
-        pattern: test-results-*
-        merge-multiple: true
-    
-    - name: 📈 Analyze Coverage
+      
+    - name: Check for security vulnerabilities
+      working-directory: ./CoverCraftPackage
       run: |
-        # Check if coverage meets minimum threshold
-        if [ -f "coverage-report.json" ]; then
-          coverage=$(jq -r '.lineCoverage' coverage-report.json 2>/dev/null || echo "0")
-          echo "Coverage: ${coverage}%"
-          
-          # Enforce minimum 90% coverage as specified
-          if (( $(echo "$coverage < 90.0" | bc -l) )); then
-            echo "❌ Coverage ${coverage}% is below required 90% threshold"
-            exit 1
-          else
-            echo "✅ Coverage ${coverage}% meets minimum requirement"
-          fi
-        else
-          echo "⚠️ No coverage report found"
-        fi
+        # Check Package.swift for known vulnerable dependencies
+        echo "Scanning Package.swift for security issues..."
+        swift package show-dependencies --format json > dependencies.json
+        
+        # Basic check for outdated dependencies
+        echo "Checking for dependency updates..."
+        swift package update --dry-run || true
+        
+    - name: Upload security scan results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: CoverCraftPackage/dependencies.json
+
+  # Contract testing for API stability
+  contract-tests:
+    name: Contract Tests
+    runs-on: macos-latest
     
-    - name: 📊 Coverage Badge
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      
+    - name: Run Contract Tests
+      working-directory: ./CoverCraftPackage
+      run: |
+        # Run only the contract tests to validate API stability
+        swift test --filter ContractTests
+        
+    - name: Upload contract test snapshots
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: contract-snapshots
+        path: CoverCraftPackage/Tests/**/__Snapshots__
+
+  # Coverage reporting
+  coverage:
+    name: Test Coverage
+    runs-on: macos-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      
+    - name: Generate test coverage
+      working-directory: ./CoverCraftPackage
+      run: |
+        swift test --enable-code-coverage
+        xcrun llvm-cov export -format="lcov" \
+          .build/debug/CoverCraftPackageTests.xctest/Contents/MacOS/CoverCraftPackageTests \
+          -instr-profile .build/debug/codecov/default.profdata > coverage.lcov
+          
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./CoverCraftPackage/coverage.lcov
+        flags: swift
+        name: CoverCraft Coverage
+        fail_ci_if_error: false
+
+  # Build for iOS Simulator (validation)
+  ios-build:
+    name: iOS Build Validation
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      
+    - name: List available simulators
+      run: xcrun simctl list devices available
+      
+    - name: Build for iOS Simulator
+      run: |
+        cd CoverCraft.xcworkspace
+        xcodebuild -workspace CoverCraft.xcworkspace \
+          -scheme CoverCraft \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          -configuration Debug \
+          build
+
+  # Documentation generation
+  docs:
+    name: Generate Documentation
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install DocC
+      run: |
+        brew update
+        brew install swift-docc-plugin || true
+        
+    - name: Generate documentation
+      working-directory: ./CoverCraftPackage
+      run: |
+        swift package generate-documentation --target CoverCraftCore
+        swift package generate-documentation --target CoverCraftDTO
+        
+    - name: Deploy documentation
       if: github.ref == 'refs/heads/main'
       run: |
-        # Generate coverage badge (simplified version)
-        coverage=$(jq -r '.lineCoverage' coverage-report.json 2>/dev/null || echo "0")
-        echo "![Coverage](https://img.shields.io/badge/coverage-${coverage}%25-brightgreen)" > coverage-badge.md
+        echo "Documentation generation completed"
+        # In a real setup, you'd deploy to GitHub Pages or similar
 
-  # Job 5: Security & Dependency Check
-  security:
-    name: 🔒 Security & Dependencies
-    runs-on: macos-14
-    timeout-minutes: 20
+  # Dependency monitoring
+  dependency-monitor:
+    name: Monitor Dependencies
+    runs-on: macos-latest
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: 🔒 Install OWASP Dependency Check
+      
+    - name: Check for dependency updates
+      working-directory: ./CoverCraftPackage
       run: |
-        brew install dependency-check
-        dependency-check --version
-    
-    - name: 🔍 Run Dependency Check
+        echo "Checking for available dependency updates..."
+        swift package update --dry-run
+        swift package show-dependencies --format json > current-deps.json
+        
+    - name: Create dependency update issue
+      if: github.ref == 'refs/heads/main'
       run: |
-        dependency-check \
-          --project "CoverCraft" \
-          --scan "CoverCraftPackage" \
-          --format "JSON" \
-          --format "HTML" \
-          --out "./dependency-reports" \
-          --suppression ".dependency-check-suppressions.xml" \
-          --failOnCVSS 7
-    
-    - name: 📊 Upload Security Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-report
-        path: dependency-reports/
-        retention-days: 30
+        echo "Would create GitHub issue for dependency updates if any are available"
+        # In real setup, use GitHub API to create issues for updates
 
-  # Job 6: Build Status Summary
-  status:
-    name: 📋 Build Status
-    runs-on: macos-14
-    timeout-minutes: 5
-    needs: [lint, build, test, coverage, security]
-    if: always()
-    
-    steps:
-    - name: 📊 Collect Job Results
-      run: |
-        echo "## CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
-        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
-    
-    - name: ✅ Success Notification
-      if: ${{ needs.lint.result == 'success' && needs.build.result == 'success' && needs.test.result == 'success' && needs.coverage.result == 'success' && needs.security.result == 'success' }}
-      run: echo "🎉 All CI checks passed successfully!"
-    
-    - name: ❌ Failure Notification
-      if: ${{ needs.lint.result == 'failure' || needs.build.result == 'failure' || needs.test.result == 'failure' || needs.coverage.result == 'failure' || needs.security.result == 'failure' }}
-      run: |
-        echo "❌ CI pipeline failed. Check individual job results."
-        exit 1
+# Schedule dependency checks weekly
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC

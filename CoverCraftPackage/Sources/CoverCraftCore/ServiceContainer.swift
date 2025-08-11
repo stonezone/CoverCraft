@@ -8,8 +8,8 @@ import Logging
 /// Protocol for dependency injection containers
 public protocol DependencyContainer: Sendable {
     func register<T>(_ service: T, for type: T.Type)
-    func registerFactory<T>(_ factory: @escaping () -> T, for type: T.Type)
-    func registerSingleton<T>(_ factory: @escaping () -> T, for type: T.Type)
+    func registerFactory<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type) 
+    func registerSingleton<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type)
     func resolve<T>(_ type: T.Type) -> T?
     func requireService<T>(_ type: T.Type) throws -> T
     func isRegistered<T>(_ type: T.Type) -> Bool
@@ -33,8 +33,7 @@ public enum ServiceContainerError: Error, LocalizedError {
     }
 }
 
-/// Default implementation of dependency injection container
-@MainActor
+/// Default implementation of dependency injection container - thread-safe with internal locking
 public final class DefaultDependencyContainer: DependencyContainer, @unchecked Sendable {
     private var services: [String: Any] = [:]
     private var factories: [String: () -> Any] = [:]
@@ -54,14 +53,14 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
     }
     
     /// Register a service factory for lazy instantiation
-    public func registerFactory<T>(_ factory: @escaping () -> T, for type: T.Type) {
+    public func registerFactory<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type) {
         let key = String(describing: type)
         factories[key] = factory
         logger.info("Registered factory: \(key)")
     }
     
     /// Register a singleton factory
-    public func registerSingleton<T>(_ factory: @escaping () -> T, for type: T.Type) {
+    public func registerSingleton<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type) {
         let key = String(describing: type)
         factories[key] = {
             let instance = factory()
@@ -140,6 +139,7 @@ public struct DependencyContainerKey: EnvironmentKey {
 }
 
 /// SwiftUI Environment extension for easy access
+@available(iOS 18.0, macOS 10.15, *)
 public extension EnvironmentValues {
     var dependencyContainer: DependencyContainer {
         get { self[DependencyContainerKey.self] }

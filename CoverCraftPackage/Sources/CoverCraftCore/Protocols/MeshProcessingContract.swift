@@ -2,8 +2,10 @@
 // Protocol contracts for mesh processing operations
 
 import Foundation
+import CoverCraftDTO
 
 /// Contract for mesh segmentation operations
+@available(iOS 18.0, macOS 10.15, *)
 public protocol MeshSegmentationContract: Actor {
     /// Segment mesh into panels using clustering algorithms
     /// - Parameters:
@@ -31,6 +33,7 @@ public protocol MeshDataContract: Sendable {
 }
 
 /// Contract for pattern flattening operations
+@available(iOS 18.0, macOS 10.15, *)
 public protocol PatternFlattenerContract: Actor {
     /// Flatten 3D panels into 2D patterns
     /// - Parameter panels: 3D panels to flatten
@@ -39,26 +42,7 @@ public protocol PatternFlattenerContract: Actor {
     func flattenPanels(_ panels: [PanelDTO]) async throws -> [FlattenedPatternDTO]
 }
 
-/// Errors that can occur during mesh segmentation
-public enum SegmentationError: LocalizedError, Sendable {
-    case emptyMesh
-    case invalidInput
-    case clusteringFailed
-    case insufficientData
-    
-    public var errorDescription: String? {
-        switch self {
-        case .emptyMesh:
-            return "Cannot segment empty mesh"
-        case .invalidInput:
-            return "Invalid input parameters for segmentation"
-        case .clusteringFailed:
-            return "Failed to cluster mesh faces"
-        case .insufficientData:
-            return "Insufficient mesh data for segmentation"
-        }
-    }
-}
+// SegmentationError is defined in CoverCraftErrors.swift
 
 /// Errors that can occur during pattern flattening
 public enum FlattenerError: LocalizedError, Sendable {
@@ -125,18 +109,4 @@ public struct BoundsDTO: Codable, Sendable, Equatable {
     }
 }
 
-/// Extension to make SIMD2<Float> Codable
-extension SIMD2<Float>: Codable {
-    public init(from decoder: Decoder) throws {
-        var container = try decoder.unkeyedContainer()
-        let x = try container.decode(Float.self)
-        let y = try container.decode(Float.self)
-        self.init(x, y)
-    }
-    
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.unkeyedContainer()
-        try container.encode(x)
-        try container.encode(y)
-    }
-}
+// SIMD2<Float> already conforms to Codable in Swift 5.3+
