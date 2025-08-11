@@ -3,7 +3,6 @@
 
 import Foundation
 import Logging
-import Metrics
 
 /// Service for collecting application metrics and performance data
 @available(iOS 18.0, *)
@@ -13,22 +12,24 @@ public final class MetricsService: @unchecked Sendable {
     
     private let logger = Logger(label: "CoverCraft.Metrics")
     
-    // Performance metrics
-    private let scanDurationTimer = Timer(label: "covercraft_scan_duration", dimensions: [("component", "ar_scanning")])
-    private let segmentationDurationTimer = Timer(label: "covercraft_segmentation_duration", dimensions: [("component", "mesh_processing")])
-    private let flatteningDurationTimer = Timer(label: "covercraft_flattening_duration", dimensions: [("component", "pattern_flattening")])
-    private let exportDurationTimer = Timer(label: "covercraft_export_duration", dimensions: [("component", "pattern_export")])
+    // Performance metrics storage
+    private var scanDurations: [TimeInterval] = []
+    private var segmentationDurations: [TimeInterval] = []
+    private var flatteningDurations: [TimeInterval] = []
+    private var exportDurations: [String: [TimeInterval]] = [:]
     
-    // Business metrics
-    private let scansCompleted = Counter(label: "covercraft_scans_completed", dimensions: [("status", "success")])
-    private let scansErrors = Counter(label: "covercraft_scans_errors", dimensions: [("error_type", "unknown")])
-    private let patternsGenerated = Counter(label: "covercraft_patterns_generated", dimensions: [("format", "unknown")])
-    private let exportFailures = Counter(label: "covercraft_export_failures", dimensions: [("format", "unknown")])
+    // Business metrics storage
+    private var scansCompleted: Int = 0
+    private var scanErrors: [String: Int] = [:]
+    private var patternsGenerated: [String: Int] = [:]
+    private var exportFailures: [String: Int] = [:]
     
-    // Quality metrics
-    private let meshTriangleCount = Histogram(label: "covercraft_mesh_triangle_count", buckets: [100, 500, 1000, 5000, 10000, 50000])
-    private let panelCount = Histogram(label: "covercraft_panel_count", buckets: [1, 2, 5, 10, 20, 50])
-    private let patternAccuracy = Histogram(label: "covercraft_pattern_accuracy", buckets: [0.5, 0.7, 0.8, 0.9, 0.95, 0.99])
+    // Quality metrics storage
+    private var meshTriangleCounts: [Int] = []
+    private var panelCounts: [Int] = []
+    private var patternAccuracies: [Double] = []
+    
+    private let queue = DispatchQueue(label: "com.covercraft.metrics", attributes: .concurrent)
     
     private init() {
         logger.info("Metrics service initialized")
@@ -38,25 +39,36 @@ public final class MetricsService: @unchecked Sendable {
     
     /// Record AR scanning duration
     public func recordScanDuration(_ duration: TimeInterval) {
-        scanDurationTimer.recordSeconds(duration)
+        queue.async(flags: .barrier) {
+            self.scanDurations.append(duration)
+        }
         logger.debug("Recorded scan duration: \(duration)s")
     }
     
     /// Record mesh segmentation duration  
     public func recordSegmentationDuration(_ duration: TimeInterval) {
-        segmentationDurationTimer.recordSeconds(duration)
+        queue.async(flags: .barrier) {
+            self.segmentationDurations.append(duration)
+        }
         logger.debug("Recorded segmentation duration: \(duration)s")
     }
     
     /// Record pattern flattening duration
     public func recordFlatteningDuration(_ duration: TimeInterval) {
-        flatteningDurationTimer.recordSeconds(duration)
+        queue.async(flags: .barrier) {
+            self.flatteningDurations.append(duration)
+        }
         logger.debug("Recorded flattening duration: \(duration)s")
     }
     
     /// Record pattern export duration
     public func recordExportDuration(_ duration: TimeInterval, format: String) {
-        exportDurationTimer.record(duration, dimensions: [("format", format)])
+        queue.async(flags: .barrier) {
+            if self.exportDurations[format] == nil {
+                self.exportDurations[format] = []
+            }
+            self.exportDurations[format]?.append(duration)
+        }
         logger.debug("Recorded export duration: \(duration)s for format: \(format)")
     }
     
@@ -64,25 +76,33 @@ public final class MetricsService: @unchecked Sendable {
     
     /// Record successful scan completion
     public func recordScanCompleted() {
-        scansCompleted.increment(dimensions: [("status", "success")])
+        queue.async(flags: .barrier) {
+            self.scansCompleted += 1
+        }
         logger.debug("Recorded successful scan completion")
     }
     
     /// Record scan error
     public func recordScanError(type: String) {
-        scansErrors.increment(dimensions: [("error_type", type)])
+        queue.async(flags: .barrier) {
+            self.scanErrors[type, default: 0] += 1
+        }
         logger.debug("Recorded scan error: \(type)")
     }
     
     /// Record pattern generation
     public func recordPatternGenerated(format: String) {
-        patternsGenerated.increment(dimensions: [("format", format)])
+        queue.async(flags: .barrier) {
+            self.patternsGenerated[format, default: 0] += 1
+        }
         logger.debug("Recorded pattern generated: \(format)")
     }
     
     /// Record export failure
     public func recordExportFailure(format: String) {
-        exportFailures.increment(dimensions: [("format", format)])
+        queue.async(flags: .barrier) {
+            self.exportFailures[format, default: 0] += 1
+        }
         logger.debug("Recorded export failure: \(format)")
     }
     
@@ -90,19 +110,25 @@ public final class MetricsService: @unchecked Sendable {
     
     /// Record mesh quality metrics
     public func recordMeshQuality(triangleCount: Int) {
-        meshTriangleCount.record(Double(triangleCount))
+        queue.async(flags: .barrier) {
+            self.meshTriangleCounts.append(triangleCount)
+        }
         logger.debug("Recorded mesh triangle count: \(triangleCount)")
     }
     
     /// Record segmentation quality
     public func recordSegmentationQuality(panelCount: Int) {
-        self.panelCount.record(Double(panelCount))
+        queue.async(flags: .barrier) {
+            self.panelCounts.append(panelCount)
+        }
         logger.debug("Recorded panel count: \(panelCount)")
     }
     
     /// Record pattern accuracy score
     public func recordPatternAccuracy(_ accuracy: Double) {
-        patternAccuracy.record(accuracy)
+        queue.async(flags: .barrier) {
+            self.patternAccuracies.append(accuracy)
+        }
         logger.debug("Recorded pattern accuracy: \(accuracy)")
     }
     
@@ -152,12 +178,48 @@ public final class MetricsService: @unchecked Sendable {
     
     /// Get current metrics summary
     public func getMetricsSummary() -> [String: Any] {
-        return [
-            "scans_completed": "Available via metrics endpoint",
-            "average_scan_duration": "Available via metrics endpoint", 
-            "patterns_generated": "Available via metrics endpoint",
-            "service_status": "active"
-        ]
+        return queue.sync {
+            var summary: [String: Any] = [:]
+            
+            summary["scans_completed"] = scansCompleted
+            summary["scan_errors"] = scanErrors
+            summary["patterns_generated"] = patternsGenerated
+            summary["export_failures"] = exportFailures
+            
+            if !scanDurations.isEmpty {
+                summary["average_scan_duration"] = scanDurations.reduce(0, +) / Double(scanDurations.count)
+            }
+            
+            if !meshTriangleCounts.isEmpty {
+                summary["average_triangle_count"] = Double(meshTriangleCounts.reduce(0, +)) / Double(meshTriangleCounts.count)
+            }
+            
+            if !patternAccuracies.isEmpty {
+                summary["average_pattern_accuracy"] = patternAccuracies.reduce(0, +) / Double(patternAccuracies.count)
+            }
+            
+            summary["service_status"] = "active"
+            return summary
+        }
+    }
+    
+    // MARK: - Test Support
+    
+    /// Reset all metrics (for testing)
+    internal func reset() {
+        queue.async(flags: .barrier) {
+            self.scanDurations.removeAll()
+            self.segmentationDurations.removeAll()
+            self.flatteningDurations.removeAll()
+            self.exportDurations.removeAll()
+            self.scansCompleted = 0
+            self.scanErrors.removeAll()
+            self.patternsGenerated.removeAll()
+            self.exportFailures.removeAll()
+            self.meshTriangleCounts.removeAll()
+            self.panelCounts.removeAll()
+            self.patternAccuracies.removeAll()
+        }
     }
 }
 

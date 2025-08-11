@@ -1,4 +1,11 @@
 import SwiftUI
+import CoverCraftDTO
+import CoverCraftCore
+import CoverCraftAR
+import CoverCraftSegmentation
+import CoverCraftFlattening
+import CoverCraftExport
+import CoverCraftUI
 
 @MainActor
 public struct ContentView: View {
@@ -184,21 +191,4 @@ public struct ContentView: View {
     }
 }
 
-// MARK: - App State
 
-@Observable
-@MainActor
-public final class AppState {
-    public var currentMesh: Mesh?
-    public var calibrationData = CalibrationData()
-    public var selectedResolution = SegmentationResolution.medium
-    public var currentPanels: [Panel]?
-    public var flattenedPanels: [FlattenedPanel]?
-    public var showPatternReady = false
-    
-    public init() {}
-    
-    public var canGeneratePattern: Bool {
-        currentMesh != nil && calibrationData.isComplete
-    }
-}

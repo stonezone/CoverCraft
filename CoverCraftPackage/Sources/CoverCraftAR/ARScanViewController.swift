@@ -2,6 +2,18 @@
 import UIKit
 import ARKit
 import SceneKit
+import simd
+
+/// Mesh data structure for AR scanned geometry
+public struct Mesh {
+    public let vertices: [SIMD3<Float>]
+    public let triangleIndices: [Int]
+    
+    public init(vertices: [SIMD3<Float>], triangleIndices: [Int]) {
+        self.vertices = vertices
+        self.triangleIndices = triangleIndices
+    }
+}
 
 /// View controller handling AR scanning with LiDAR
 public final class ARScanViewController: UIViewController {

@@ -1,0 +1,455 @@
+// Version: 1.0.0
+// CoverCraft Test Utilities - Mock Pattern Export Service
+// 
+// TDD-compliant mock implementation for PatternExportService protocol
+// Designed for deterministic, isolated test scenarios
+
+import Foundation
+import CoverCraftCore
+import CoverCraftDTO
+
+/// Mock implementation of PatternExportService for testing
+/// 
+/// Provides deterministic behavior for test scenarios with configurable responses.
+/// All async operations complete immediately for test performance.
+@available(iOS 18.0, *)
+public final class MockPatternExportService: PatternExportService, @unchecked Sendable {
+    
+    // MARK: - Test Configuration
+    
+    /// Current mock state for controlling behavior
+    public enum MockState {
+        case ready
+        case exporting
+        case validating
+        case error(Error)
+    }
+    
+    /// Mock state controlling service behavior
+    public var mockState: MockState = .ready
+    
+    /// Mock export result to return from exportPatterns
+    public var mockExportResult: ExportResult?
+    
+    /// Mock supported formats to return from getSupportedFormats
+    public var mockSupportedFormats: [ExportFormat] = ExportFormat.allCases
+    
+    /// Mock validation result to return from validateForExport
+    public var mockValidationResult: ValidationResult = ValidationResult(isValid: true)
+    
+    /// Delay for async operations (for testing timing scenarios)
+    public var mockAsyncDelay: TimeInterval = 0.0
+    
+    /// Whether to generate realistic export data
+    public var shouldGenerateRealisticResults: Bool = true
+    
+    // MARK: - Test Tracking
+    
+    /// Number of times exportPatterns was called
+    public private(set) var exportPatternsCallCount: Int = 0
+    
+    /// Number of times getSupportedFormats was called
+    public private(set) var getSupportedFormatsCallCount: Int = 0
+    
+    /// Number of times validateForExport was called
+    public private(set) var validateForExportCallCount: Int = 0
+    
+    /// Last panels passed to exportPatterns
+    public private(set) var lastExportPanels: [FlattenedPanelDTO]?
+    
+    /// Last format passed to exportPatterns
+    public private(set) var lastExportFormat: ExportFormat?
+    
+    /// Last options passed to exportPatterns
+    public private(set) var lastExportOptions: ExportOptions?
+    
+    /// Last panels passed to validateForExport
+    public private(set) var lastValidatePanels: [FlattenedPanelDTO]?
+    
+    /// Last format passed to validateForExport
+    public private(set) var lastValidateFormat: ExportFormat?
+    
+    /// All method calls in order with parameters
+    public private(set) var methodCallHistory: [(method: String, parameters: [String: Any])] = []
+    
+    // MARK: - Initialization
+    
+    /// Creates a new mock pattern export service
+    /// - Parameters:
+    ///   - initialState: Initial mock state
+    ///   - exportResult: Mock export result to return
+    ///   - supportedFormats: Mock supported formats
+    ///   - validationResult: Mock validation result
+    public init(
+        initialState: MockState = .ready,
+        exportResult: ExportResult? = nil,
+        supportedFormats: [ExportFormat] = ExportFormat.allCases,
+        validationResult: ValidationResult = ValidationResult(isValid: true)
+    ) {
+        self.mockState = initialState
+        self.mockExportResult = exportResult
+        self.mockSupportedFormats = supportedFormats
+        self.mockValidationResult = validationResult
+    }
+    
+    // MARK: - PatternExportService Protocol Implementation
+    
+    public func exportPatterns(_ panels: [FlattenedPanelDTO], format: ExportFormat, options: ExportOptions) async throws -> ExportResult {
+        await Task.sleep(nanoseconds: UInt64(mockAsyncDelay * 1_000_000_000))
+        
+        exportPatternsCallCount += 1
+        lastExportPanels = panels
+        lastExportFormat = format
+        lastExportOptions = options
+        
+        let parameters: [String: Any] = [
+            "panelCount": panels.count,
+            "format": format.rawValue,
+            "includeSeamAllowance": options.includeSeamAllowance,
+            "paperSize": options.paperSize.rawValue
+        ]
+        methodCallHistory.append((method: "exportPatterns", parameters: parameters))
+        
+        switch mockState {
+        case .ready, .exporting:
+            mockState = .exporting
+            defer { mockState = .ready }
+            
+            if shouldGenerateRealisticResults {
+                return generateExportResult(for: panels, format: format, options: options)
+            } else if let mockResult = mockExportResult {
+                return mockResult
+            } else {
+                return generateDefaultExportResult(format: format)
+            }
+            
+        case .validating:
+            throw PatternExportError.invalidState("Cannot export while validating")
+            
+        case .error(let error):
+            throw error
+        }
+    }
+    
+    public func getSupportedFormats() -> [ExportFormat] {
+        getSupportedFormatsCallCount += 1
+        methodCallHistory.append((method: "getSupportedFormats", parameters: [:]))
+        
+        return mockSupportedFormats
+    }
+    
+    public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult {
+        validateForExportCallCount += 1
+        lastValidatePanels = panels
+        lastValidateFormat = format
+        
+        let parameters: [String: Any] = [
+            "panelCount": panels.count,
+            "format": format.rawValue
+        ]
+        methodCallHistory.append((method: "validateForExport", parameters: parameters))
+        
+        switch mockState {
+        case .ready, .validating:
+            mockState = .validating
+            defer { mockState = .ready }
+            
+            if shouldGenerateRealisticResults {
+                return generateValidationResult(for: panels, format: format)
+            } else {
+                return mockValidationResult
+            }
+            
+        case .exporting:
+            return ValidationResult(isValid: false, errors: ["Cannot validate while exporting"])
+            
+        case .error:
+            return ValidationResult(isValid: false, errors: ["Service in error state"])
+        }
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func generateExportResult(for panels: [FlattenedPanelDTO], format: ExportFormat, options: ExportOptions) -> ExportResult {
+        let filename = "cover_pattern_\(Date().timeIntervalSince1970).\(format.fileExtension)"
+        let mockData = generateMockExportData(for: format, panelCount: panels.count)
+        
+        let metadata = [
+            "panelCount": "\(panels.count)",
+            "format": format.rawValue,
+            "includeSeamAllowance": "\(options.includeSeamAllowance)",
+            "seamAllowanceWidth": "\(options.seamAllowanceWidth)mm",
+            "paperSize": options.paperSize.rawValue,
+            "generatedAt": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        return ExportResult(
+            data: mockData,
+            format: format,
+            filename: filename,
+            metadata: metadata
+        )
+    }
+    
+    private func generateMockExportData(for format: ExportFormat, panelCount: Int) -> Data {
+        let content: String
+        
+        switch format {
+        case .pdf:
+            content = "%PDF-1.4\n% Mock PDF with \(panelCount) panels"
+        case .svg:
+            content = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <svg xmlns="http://www.w3.org/2000/svg" width="210" height="297">
+              <!-- Mock SVG with \(panelCount) panels -->
+            </svg>
+            """
+        case .png:
+            // PNG header bytes
+            return Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        case .gif:
+            // GIF header
+            return Data("GIF89a".utf8)
+        case .dxf:
+            content = """
+            0
+            SECTION
+            2
+            HEADER
+            0
+            ENDSEC
+            999
+            Mock DXF with \(panelCount) panels
+            0
+            EOF
+            """
+        }
+        
+        return content.data(using: .utf8) ?? Data()
+    }
+    
+    private func generateValidationResult(for panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult {
+        var errors: [String] = []
+        var warnings: [String] = []
+        
+        // Validate panels
+        if panels.isEmpty {
+            errors.append("No panels to export")
+        }
+        
+        for (index, panel) in panels.enumerated() {
+            if !panel.isValid {
+                errors.append("Panel \(index) is invalid")
+            }
+            
+            if panel.area < 1.0 {
+                warnings.append("Panel \(index) has very small area")
+            }
+        }
+        
+        // Format-specific validation
+        switch format {
+        case .pdf, .svg:
+            if panels.count > 50 {
+                warnings.append("Large number of panels may affect export performance")
+            }
+        case .png, .gif:
+            if panels.count > 20 {
+                warnings.append("Raster formats may not be suitable for many panels")
+            }
+        case .dxf:
+            if panels.isEmpty {
+                errors.append("DXF export requires at least one panel")
+            }
+        }
+        
+        return ValidationResult(
+            isValid: errors.isEmpty,
+            errors: errors,
+            warnings: warnings
+        )
+    }
+    
+    private func generateDefaultExportResult(format: ExportFormat) -> ExportResult {
+        let filename = "default_export.\(format.fileExtension)"
+        let mockData = "Mock export data".data(using: .utf8) ?? Data()
+        
+        return ExportResult(
+            data: mockData,
+            format: format,
+            filename: filename,
+            metadata: ["type": "default"]
+        )
+    }
+    
+    // MARK: - Test Helpers
+    
+    /// Reset all call counts and history for fresh test state
+    public func resetTestTracking() {
+        exportPatternsCallCount = 0
+        getSupportedFormatsCallCount = 0
+        validateForExportCallCount = 0
+        lastExportPanels = nil
+        lastExportFormat = nil
+        lastExportOptions = nil
+        lastValidatePanels = nil
+        lastValidateFormat = nil
+        methodCallHistory.removeAll()
+    }
+    
+    /// Configure service to simulate export error
+    /// - Parameter error: Error to throw from export operations
+    public func simulateError(_ error: Error) {
+        mockState = .error(error)
+    }
+    
+    /// Configure mock export result
+    /// - Parameter result: Export result to return from exportPatterns
+    public func configureMockExportResult(_ result: ExportResult) {
+        mockExportResult = result
+    }
+    
+    /// Configure mock supported formats
+    /// - Parameter formats: Supported formats to return
+    public func configureMockSupportedFormats(_ formats: [ExportFormat]) {
+        mockSupportedFormats = formats
+    }
+    
+    /// Configure mock validation result
+    /// - Parameter result: Validation result to return
+    public func configureMockValidationResult(_ result: ValidationResult) {
+        mockValidationResult = result
+    }
+    
+    /// Verify that exportPatterns was called with specific parameters
+    /// - Parameters:
+    ///   - expectedPanelCount: Expected number of panels
+    ///   - expectedFormat: Expected export format
+    /// - Returns: Whether exportPatterns was called with expected parameters
+    public func verifyExportPatternsCalled(withPanelCount expectedPanelCount: Int, format expectedFormat: ExportFormat) -> Bool {
+        guard let lastPanels = lastExportPanels,
+              let lastFormat = lastExportFormat else {
+            return false
+        }
+        
+        return lastPanels.count == expectedPanelCount && lastFormat == expectedFormat
+    }
+    
+    /// Verify that validateForExport was called with specific parameters
+    /// - Parameters:
+    ///   - expectedPanelCount: Expected number of panels
+    ///   - expectedFormat: Expected format
+    /// - Returns: Whether validateForExport was called with expected parameters
+    public func verifyValidateForExportCalled(withPanelCount expectedPanelCount: Int, format expectedFormat: ExportFormat) -> Bool {
+        guard let lastPanels = lastValidatePanels,
+              let lastFormat = lastValidateFormat else {
+            return false
+        }
+        
+        return lastPanels.count == expectedPanelCount && lastFormat == expectedFormat
+    }
+    
+    /// Get total number of method calls
+    /// - Returns: Total number of calls made to service methods
+    public func getTotalCallCount() -> Int {
+        exportPatternsCallCount + getSupportedFormatsCallCount + validateForExportCallCount
+    }
+    
+    /// Verify that export options were passed correctly
+    /// - Parameter expectedOptions: Expected export options
+    /// - Returns: Whether export options match expected values
+    public func verifyExportOptions(_ expectedOptions: ExportOptions) -> Bool {
+        guard let lastOptions = lastExportOptions else {
+            return false
+        }
+        
+        return lastOptions == expectedOptions
+    }
+}
+
+// MARK: - Mock Error Types
+
+/// Errors that can be thrown by mock pattern export service
+@available(iOS 18.0, *)
+public enum PatternExportError: Error, Equatable, LocalizedError {
+    case invalidPanels(String)
+    case exportFailed(String)
+    case unsupportedFormat(String)
+    case invalidState(String)
+    case validationFailed([String])
+    
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPanels(let reason):
+            return "Invalid panels for export: \(reason)"
+        case .exportFailed(let reason):
+            return "Pattern export failed: \(reason)"
+        case .unsupportedFormat(let format):
+            return "Unsupported export format: \(format)"
+        case .invalidState(let reason):
+            return "Invalid service state: \(reason)"
+        case .validationFailed(let errors):
+            return "Validation failed: \(errors.joined(separator: ", "))"
+        }
+    }
+}
+
+// MARK: - Factory Methods for Common Test Scenarios
+
+@available(iOS 18.0, *)
+public extension MockPatternExportService {
+    
+    /// Create a mock service that returns successful export results
+    /// - Returns: Configured mock service with successful results
+    static func withSuccessfulExport() -> MockPatternExportService {
+        let mockResult = ExportResult(
+            data: "Test export data".data(using: .utf8) ?? Data(),
+            format: .pdf,
+            filename: "test_export.pdf"
+        )
+        return MockPatternExportService(exportResult: mockResult)
+    }
+    
+    /// Create a mock service that simulates export failure
+    /// - Returns: Configured mock service that throws errors
+    static func withExportError() -> MockPatternExportService {
+        return MockPatternExportService(
+            initialState: .error(PatternExportError.exportFailed("Test error"))
+        )
+    }
+    
+    /// Create a mock service with limited format support
+    /// - Parameter supportedFormats: Limited set of supported formats
+    /// - Returns: Configured mock service with limited formats
+    static func withLimitedFormats(_ supportedFormats: [ExportFormat]) -> MockPatternExportService {
+        return MockPatternExportService(supportedFormats: supportedFormats)
+    }
+    
+    /// Create a mock service that fails validation
+    /// - Returns: Configured mock service with validation failures
+    static func withValidationFailure() -> MockPatternExportService {
+        let validationResult = ValidationResult(
+            isValid: false,
+            errors: ["Test validation error"],
+            warnings: ["Test validation warning"]
+        )
+        return MockPatternExportService(validationResult: validationResult)
+    }
+    
+    /// Create a mock service with async delay for timing tests
+    /// - Parameter delay: Delay in seconds for async operations
+    /// - Returns: Configured mock service with delay
+    static func withDelay(_ delay: TimeInterval) -> MockPatternExportService {
+        let mock = MockPatternExportService()
+        mock.mockAsyncDelay = delay
+        return mock
+    }
+    
+    /// Create a mock service that returns static results (not generated)
+    /// - Returns: Configured mock service with static behavior
+    static func withStaticResults() -> MockPatternExportService {
+        let mock = MockPatternExportService()
+        mock.shouldGenerateRealisticResults = false
+        return mock
+    }
+}

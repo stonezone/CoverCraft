@@ -121,7 +121,7 @@ public actor PatternExporter: PatternExporterProtocol {
     // MARK: - SVG Export
     
     private func exportToSVG(_ panels: [FlattenedPanel]) async throws -> URL {
-        let layout = layoutPanels(panels, pageSize: .letter, dpi: 72) // SVG uses 72 DPI
+        let layout = layoutPanels(panels, pageSize: PaperSize.letter, dpi: 72) // SVG uses 72 DPI
         
         var svg = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -178,8 +178,8 @@ public actor PatternExporter: PatternExporterProtocol {
         </svg>
         """
         
-        let url = getTemporaryURL(format: .svg)
-        try svg.write(to: url, atomically: true, encoding: .utf8)
+        let url = getTemporaryURL(format: ExportFormat.svg)
+        try svg.write(to: url, atomically: true, encoding: String.Encoding.utf8)
         return url
     }
     
