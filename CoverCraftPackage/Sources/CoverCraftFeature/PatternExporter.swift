@@ -3,7 +3,13 @@ import PDFKit
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
+#if canImport(UIKit)
 import UIKit
+typealias PlatformColor = PlatformColor
+#elseif canImport(AppKit)
+import AppKit
+typealias PlatformColor = NSColor
+#endif
 
 /// Export patterns to various formats with real-world scaling
 public actor PatternExporter: PatternExporterProtocol {
@@ -40,7 +46,7 @@ public actor PatternExporter: PatternExporterProtocol {
             let cgContext = context.cgContext
             
             // White background
-            cgContext.setFillColor(UIColor.white.cgColor)
+            cgContext.setFillColor(PlatformColor.white.cgColor)
             cgContext.fill(CGRect(origin: .zero, size: size))
             
             // Draw patterns and labels
@@ -82,7 +88,7 @@ public actor PatternExporter: PatternExporterProtocol {
         // Frame 0: All panels
         let allPanelsImage = renderer.image { context in
             let cgContext = context.cgContext
-            cgContext.setFillColor(UIColor.white.cgColor)
+            cgContext.setFillColor(PlatformColor.white.cgColor)
             cgContext.fill(CGRect(origin: .zero, size: size))
             drawPatterns(cgContext, layout: layout, includeLabels: true)
         }
@@ -95,7 +101,7 @@ public actor PatternExporter: PatternExporterProtocol {
         for (index, _) in panels.enumerated() {
             let singlePanelImage = renderer.image { context in
                 let cgContext = context.cgContext
-                cgContext.setFillColor(UIColor.white.cgColor)
+                cgContext.setFillColor(PlatformColor.white.cgColor)
                 cgContext.fill(CGRect(origin: .zero, size: size))
                 drawSinglePanel(cgContext, layout: layout, panelIndex: index, includeLabels: true)
             }
@@ -137,7 +143,7 @@ public actor PatternExporter: PatternExporterProtocol {
             let panel = panels[panelIndex]
             let color = panel.sourcePanel.color
             
-            // Convert UIColor to RGB
+            // Convert PlatformColor to RGB
             var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
             color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             let hexColor = String(format: "#%02x%02x%02x", Int(red * 255), Int(green * 255), Int(blue * 255))
@@ -193,7 +199,7 @@ public actor PatternExporter: PatternExporterProtocol {
         context.beginPDFPage(nil as CFDictionary?)
         
         // White background
-        context.setFillColor(UIColor.white.cgColor)
+        context.setFillColor(PlatformColor.white.cgColor)
         context.fill(bounds)
         
         // Draw patterns and labels
@@ -271,7 +277,7 @@ public actor PatternExporter: PatternExporterProtocol {
     
     private func drawPatterns(_ context: CGContext, layout: PageLayout, includeLabels: Bool) {
         context.setLineWidth(1.0)
-        context.setStrokeColor(UIColor.black.cgColor)
+        context.setStrokeColor(PlatformColor.black.cgColor)
         
         for (index, panelLayout) in layout.panels.enumerated() {
             // Parse points from path string
@@ -303,7 +309,7 @@ public actor PatternExporter: PatternExporterProtocol {
                 let text = "Panel \(index + 1)"
                 let attributes: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 12),
-                    .foregroundColor: UIColor.black
+                    .foregroundColor: PlatformColor.black
                 ]
                 
                 let attributedString = NSAttributedString(string: text, attributes: attributes)
@@ -334,7 +340,7 @@ public actor PatternExporter: PatternExporterProtocol {
             let scaleText = "10 cm"
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 10),
-                .foregroundColor: UIColor.black
+                .foregroundColor: PlatformColor.black
             ]
             
             let attributedString = NSAttributedString(string: scaleText, attributes: attributes)
@@ -369,7 +375,7 @@ public actor PatternExporter: PatternExporterProtocol {
         }
         
         context.setLineWidth(2.0)
-        context.setStrokeColor(UIColor.red.cgColor)
+        context.setStrokeColor(PlatformColor.red.cgColor)
         
         if !points.isEmpty {
             context.beginPath()
@@ -385,7 +391,7 @@ public actor PatternExporter: PatternExporterProtocol {
             let text = "Panel \(panelIndex + 1)"
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 14, weight: .bold),
-                .foregroundColor: UIColor.red
+                .foregroundColor: PlatformColor.red
             ]
             
             let attributedString = NSAttributedString(string: text, attributes: attributes)
