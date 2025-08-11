@@ -12,7 +12,7 @@ public final class ServiceContainer: @unchecked Sendable {
     /// Shared instance for global access
     public static let shared = ServiceContainer()
     
-    private init() {}
+    public init() {}
     
     /// Register a service instance
     public func register<T>(_ service: T, for type: T.Type) {
@@ -46,7 +46,7 @@ public final class ServiceContainer: @unchecked Sendable {
 
 /// SwiftUI Environment key for service container  
 public struct ServiceContainerKey: EnvironmentKey {
-    nonisolated(unsafe) public static let defaultValue: ServiceContainer = ServiceContainer.shared
+    public static let defaultValue: ServiceContainer = ServiceContainer()
 }
 
 /// SwiftUI Environment extension for easy access
@@ -61,8 +61,10 @@ public extension EnvironmentValues {
 public extension ServiceContainer {
     /// Register default CoverCraft services
     func registerCoverCraftServices() {
-        // Services will be registered here when implementations are created
-        // Example:
-        // register(MeshSegmentationService(), for: MeshSegmentationContract.self)
+        // Import required types
+        guard let featureModule = Bundle(identifier: "CoverCraftFeature") else {
+            // For SPM packages, services are directly available
+            return
+        }
     }
 }

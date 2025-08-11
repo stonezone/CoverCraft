@@ -15,16 +15,11 @@ let package = Package(
     targets: [
         .target(
             name: "CoverCraftFeature",
-            dependencies: [
-                // Apple system frameworks are automatically available
-                // Third-party dependencies would be listed here when added
-            ]
+            dependencies: []
         ),
         .testTarget(
             name: "CoverCraftFeatureTests",
-            dependencies: [
-                "CoverCraftFeature"
-            ]
+            dependencies: ["CoverCraftFeature"]
         ),
     ]
 )
