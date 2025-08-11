@@ -1,10 +1,10 @@
 import Foundation
-#if canImport(UIKit)
+import simd
+
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
 import AppKit
-#endif
 #endif
 
 /// Represents a segmented panel of the mesh
@@ -27,20 +27,27 @@ public struct Panel: Identifiable, Sendable {
     #endif
     
     #if canImport(UIKit)
-    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: UIColor)
-    #elseif canImport(AppKit)
-    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: NSColor)
-    #else
-    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: String)
-    #endif {
+    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: UIColor) {
         self.vertexIndices = vertexIndices
         self.triangleIndices = triangleIndices
         self.color = color
     }
+    #elseif canImport(AppKit)
+    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: NSColor) {
+        self.vertexIndices = vertexIndices
+        self.triangleIndices = triangleIndices
+        self.color = color
+    }
+    #else
+    public init(vertexIndices: Set<Int>, triangleIndices: [Int], color: String) {
+        self.vertexIndices = vertexIndices
+        self.triangleIndices = triangleIndices
+        self.color = color
+    }
+    #endif
     
     /// Check if panel is valid
     public var isValid: Bool {
         !vertexIndices.isEmpty && !triangleIndices.isEmpty
     }
 }
-

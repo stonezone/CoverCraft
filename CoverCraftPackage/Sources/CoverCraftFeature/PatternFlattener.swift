@@ -57,10 +57,20 @@ public actor PatternFlattener: PatternFlattenerProtocol {
             }
         }
         
+        // Calculate bounding box
+        let xs = cgPoints.map { $0.x }
+        let ys = cgPoints.map { $0.y }
+        let minX = xs.min() ?? 0
+        let maxX = xs.max() ?? 0
+        let minY = ys.min() ?? 0
+        let maxY = ys.max() ?? 0
+        let boundingBox = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        
         return FlattenedPanel(
             points2D: cgPoints,
+            edges: edgeIndices,
             sourcePanel: panel,
-            edges: edgeIndices
+            boundingBox: boundingBox
         )
     }
     
