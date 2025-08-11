@@ -1,0 +1,101 @@
+# GitHub Dependabot Configuration for CoverCraft
+# Automatically monitors and updates dependencies for security and maintenance
+
+version: 2
+updates:
+  # Swift Package Manager dependencies
+  - package-ecosystem: "swift"
+    directory: "/CoverCraftPackage"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    
+    # Dependency update settings
+    open-pull-requests-limit: 5
+    
+    # Auto-merge settings for patch and minor updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    
+    # Commit message settings
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    
+    # Pull request settings
+    pull-request-branch-name:
+      separator: "/"
+    
+    # Review settings
+    reviewers:
+      - "maintainer-username"  # Replace with actual maintainer
+    
+    # Labels for categorization
+    labels:
+      - "dependencies"
+      - "security"
+      - "automated"
+    
+    # Ignore specific dependencies (example - customize as needed)
+    ignore:
+      # Ignore major version updates for stable dependencies
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    
+    # Group related updates
+    groups:
+      apple-frameworks:
+        patterns:
+          - "swift-*"
+          - "apple-*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      testing-frameworks:
+        patterns:
+          - "*testing*"
+          - "*test*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "America/New_York"
+    
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    
+    labels:
+      - "ci/cd"
+      - "dependencies"
+      - "automated"
+
+  # Docker dependencies (if Docker is added in future)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "America/New_York"
+    
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    
+    labels:
+      - "docker"
+      - "dependencies"
+      - "automated"

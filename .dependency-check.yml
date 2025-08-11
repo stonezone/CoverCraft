@@ -1,0 +1,75 @@
+# Dependency Check Configuration for CoverCraft
+# This configuration file is used by the OWASP Dependency Check tool
+# to scan for known vulnerabilities in project dependencies
+
+# Currently, this project has zero third-party dependencies
+# This configuration is prepared for future dependency additions
+
+# Global settings
+format: ALL
+project: CoverCraft
+scan: ./CoverCraftPackage
+out: ./dependency-check-reports
+
+# Suppression file for false positives
+suppressionFile: .dependency-check-suppressions.xml
+
+# Database settings
+data:
+  directory: ./.dependency-check-data
+  
+# Update database daily
+updateonly: false
+
+# Skip these file types (not applicable for Swift packages)
+skip:
+  - jar
+  - war
+  - ear
+
+# Swift Package Manager specific settings
+experimental:
+  enabled: true
+  
+# Report settings
+failOnCVSS: 7.0  # Fail on High or Critical vulnerabilities
+prettyPrint: true
+
+# Analyzer settings
+analyzers:
+  # Enable Swift Package Manager analyzer when available
+  experimentalEnabled: true
+  
+  # Disable analyzers not relevant to Swift
+  golangDepEnabled: false
+  golangModEnabled: false
+  nodeEnabled: false
+  retireJSEnabled: false
+  
+# Cache settings
+enableExperimental: true
+enableRetired: true
+
+# Output settings
+reportFormat:
+  - HTML
+  - JSON
+  - XML
+  
+# Logging
+logLevel: INFO
+logFile: ./dependency-check.log
+
+# Auto-update settings
+autoupdate:
+  enabled: true
+  
+# Notification settings (for CI/CD integration)
+notifications:
+  # Webhook URL for security alerts (to be configured)
+  webhook: ""
+  
+# Custom CVE data feeds
+cveDatafeeds:
+  - https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz
+  - https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz

@@ -1,0 +1,31 @@
+# Project Summary: CoverCraft
+
+## Project Goals
+The goal of the CoverCraft project is to develop a user-friendly mobile app that allows users to easily create custom-fit covers for various objects using readily available materials like tarps. The app will generate sewing patterns based on user-provided photos and specifications, enabling users to create protective covers for items such as UTVs, PWCs, wheelbarrows, and more.
+
+## Requirements
+1. User-friendly interface for taking or uploading photos of objects from front and side angles
+2. Ability to calibrate object size by selecting two points on the photos
+3. Option to choose the resolution of the cover (low, medium, high)
+4. Accurate 3D modeling of the cover based on object dimensions and selected resolution
+5. Automatic unfolding of the 3D model into a 2D sewing pattern
+6. Generation of a transparent GIF output with the sewing pattern and a legend indicating scale
+7. Optimization for performance and user experience
+8. Cross-platform compatibility (iOS and Android)
+
+## Features
+1. Simple and intuitive user interface
+2. Customizable cover resolution (low: 5 sides, medium: 6-10 panels, high: up to 15 panels)
+3. Accurate scaling of the sewing pattern based on user-defined measurements
+4. Single-page transparent GIF output for easy projection and cutting
+5. Compatibility with a wide range of object sizes and shapes
+6. Fast and efficient processing of user input and pattern generation
+7. Ability to save and share generated patterns
+8. Comprehensive help and tutorial section
+
+## Future Enhancements
+1. Support for adding openings, windows, vents, zippers, or velcro to the pattern
+2. Integration with a marketplace for purchasing materials and accessories
+3. Community features for sharing and discovering user-created patterns
+4. Advanced editing tools for refining generated patterns
+5. Compatibility with additional file formats for pattern output

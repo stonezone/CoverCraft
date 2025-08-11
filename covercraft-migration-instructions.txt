@@ -1,0 +1,785 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<migration_instructions>
+  <metadata>
+    <project>CoverCraft iOS Application</project>
+    <base_path>/Users/zackjordan/code/CoverCraft_Xcode_Project</base_path>
+    <target_ios>18.0</target_ios>
+    <swift_version>6.0</swift_version>
+    <created>2025-08-09</created>
+  </metadata>
+
+  <phase id="1" name="Initial Assessment and Vibe Check">
+    <step order="1">
+      <action>Navigate to project directory</action>
+      <command>cd /Users/zackjordan/code/CoverCraft_Xcode_Project</command>
+    </step>
+    
+    <step order="2">
+      <action>Verify project builds successfully before changes</action>
+      <command>
+        xcodebuild build \
+          -workspace CoverCraft.xcworkspace \
+          -scheme CoverCraft \
+          -destination 'platform=iOS Simulator,name=iPhone 16'
+      </command>
+      <verify>Build should succeed without errors</verify>
+    </step>
+    
+    <vibe_check id="1">
+      <action>vibe_check</action>
+      <parameters>
+        <plan>Migrating CoverCraft to better architecture by reorganizing modules, adding logging, improving algorithms while keeping modern Swift patterns</plan>
+        <userRequest>Improve CoverCraft architecture with better separation, logging, and k-means++ algorithm</userRequest>
+        <confidence>0.9</confidence>
+        <phase>planning</phase>
+      </parameters>
+      <expected_feedback>Focus on incremental changes, avoid over-engineering, maintain existing working patterns</expected_feedback>
+    </vibe_check>
+  </phase>
+
+  <phase id="2" name="Restructure Package Organization">
+    <step order="1">
+      <action>Create new directory structure in CoverCraftPackage/Sources</action>
+      <commands>
+        mkdir -p CoverCraftPackage/Sources/CoverCraftCore/Models
+        mkdir -p CoverCraftPackage/Sources/CoverCraftCore/Protocols
+        mkdir -p CoverCraftPackage/Sources/CoverCraftCore/Extensions
+        mkdir -p CoverCraftPackage/Sources/CoverCraftAR
+        mkdir -p CoverCraftPackage/Sources/CoverCraftSegmentation
+        mkdir -p CoverCraftPackage/Sources/CoverCraftFlattening
+        mkdir -p CoverCraftPackage/Sources/CoverCraftUI/Views
+        mkdir -p CoverCraftPackage/Sources/CoverCraftShared/Logging
+      </commands>
+    </step>
+    
+    <step order="2">
+      <action>Move files to new structure - DO NOT change content yet</action>
+      <moves>
+        <move from="CoverCraftFeature/ServiceProtocols.swift" to="CoverCraftCore/Protocols/ServiceProtocols.swift"/>
+        <move from="CoverCraftFeature/Mesh.swift" to="CoverCraftCore/Models/Mesh.swift"/>
+        <move from="CoverCraftFeature/Panel.swift" to="CoverCraftCore/Models/Panel.swift"/>
+        <move from="CoverCraftFeature/CalibrationData.swift" to="CoverCraftCore/Models/CalibrationData.swift"/>
+        <move from="CoverCraftFeature/ARScanView.swift" to="CoverCraftAR/ARScanView.swift"/>
+        <move from="CoverCraftFeature/ARScanViewController.swift" to="CoverCraftAR/ARScanViewController.swift"/>
+        <move from="CoverCraftFeature/MeshSegmentationService.swift" to="CoverCraftSegmentation/MeshSegmentationService.swift"/>
+        <move from="CoverCraftFeature/PatternFlattener.swift" to="CoverCraftFlattening/PatternFlattener.swift"/>
+        <move from="CoverCraftFeature/ContentView.swift" to="CoverCraftUI/ContentView.swift"/>
+        <move from="CoverCraftFeature/CalibrationView.swift" to="CoverCraftUI/Views/CalibrationView.swift"/>
+        <move from="CoverCraftFeature/ExportView.swift" to="CoverCraftUI/Views/ExportView.swift"/>
+        <move from="CoverCraftFeature/HelpView.swift" to="CoverCraftUI/Views/HelpView.swift"/>
+        <move from="CoverCraftFeature/SegmentationPreview.swift" to="CoverCraftUI/Views/SegmentationPreview.swift"/>
+      </moves>
+    </step>
+    
+    <step order="3">
+      <action>Update Package.swift to reflect new structure</action>
+      <file path="CoverCraftPackage/Package.swift">
+        <content><![CDATA[
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "CoverCraftPackage",
+    platforms: [.iOS(.v18)],
+    products: [
+        .library(name: "CoverCraftCore", targets: ["CoverCraftCore"]),
+        .library(name: "CoverCraftAR", targets: ["CoverCraftAR"]),
+        .library(name: "CoverCraftSegmentation", targets: ["CoverCraftSegmentation"]),
+        .library(name: "CoverCraftFlattening", targets: ["CoverCraftFlattening"]),
+        .library(name: "CoverCraftUI", targets: ["CoverCraftUI"]),
+        .library(name: "CoverCraftShared", targets: ["CoverCraftShared"]),
+    ],
+    dependencies: [
+        // No external dependencies yet - will add in phase 5
+    ],
+    targets: [
+        .target(
+            name: "CoverCraftCore",
+            dependencies: []
+        ),
+        .target(
+            name: "CoverCraftShared",
+            dependencies: ["CoverCraftCore"]
+        ),
+        .target(
+            name: "CoverCraftAR",
+            dependencies: ["CoverCraftCore", "CoverCraftShared"]
+        ),
+        .target(
+            name: "CoverCraftSegmentation",
+            dependencies: ["CoverCraftCore", "CoverCraftShared"]
+        ),
+        .target(
+            name: "CoverCraftFlattening",
+            dependencies: ["CoverCraftCore", "CoverCraftShared"]
+        ),
+        .target(
+            name: "CoverCraftUI",
+            dependencies: [
+                "CoverCraftCore",
+                "CoverCraftAR",
+                "CoverCraftSegmentation",
+                "CoverCraftFlattening",
+                "CoverCraftShared"
+            ]
+        ),
+        .testTarget(
+            name: "CoverCraftCoreTests",
+            dependencies: ["CoverCraftCore"]
+        ),
+        .testTarget(
+            name: "CoverCraftSegmentationTests",
+            dependencies: ["CoverCraftSegmentation", "CoverCraftCore"]
+        ),
+        .testTarget(
+            name: "CoverCraftFlattenerTests",
+            dependencies: ["CoverCraftFlattening", "CoverCraftCore"]
+        ),
+    ]
+)
+        ]]></content>
+      </file>
+    </step>
+    
+    <verify>
+      <command>swift build --package-path CoverCraftPackage</command>
+      <expected>Build should succeed with new structure</expected>
+    </verify>
+  </phase>
+
+  <phase id="3" name="Add Logging Infrastructure">
+    <step order="1">
+      <action>Create Logger.swift in CoverCraftShared</action>
+      <file path="CoverCraftPackage/Sources/CoverCraftShared/Logging/Logger.swift">
+        <content><![CDATA[
+import Foundation
+import os
+
+/// Centralized logging for CoverCraft subsystems
+public enum Log {
+    /// AR scanning and mesh capture
+    public static let ar = Logger(subsystem: "com.covercraft", category: "ar.scan")
+    
+    /// Mesh segmentation operations
+    public static let segmentation = Logger(subsystem: "com.covercraft", category: "mesh.segmentation")
+    
+    /// Pattern flattening operations
+    public static let flattening = Logger(subsystem: "com.covercraft", category: "pattern.flattening")
+    
+    /// Export operations
+    public static let export = Logger(subsystem: "com.covercraft", category: "export")
+    
+    /// Calibration operations
+    public static let calibration = Logger(subsystem: "com.covercraft", category: "calibration")
+    
+    /// UI interactions
+    public static let ui = Logger(subsystem: "com.covercraft", category: "ui")
+}
+
+/// Performance monitoring helpers
+public extension Logger {
+    func measureTime<T>(
+        operation: String,
+        _ block: () async throws -> T
+    ) async rethrows -> T {
+        let start = CFAbsoluteTimeGetCurrent()
+        defer {
+            let elapsed = CFAbsoluteTimeGetCurrent() - start
+            self.info("\(operation) completed in \(elapsed, format: .fixed(precision: 3))s")
+        }
+        return try await block()
+    }
+}
+        ]]></content>
+      </file>
+    </step>
+    
+    <step order="2">
+      <action>Add logging to MeshSegmentationService - Keep existing async/actor pattern</action>
+      <modification path="CoverCraftPackage/Sources/CoverCraftSegmentation/MeshSegmentationService.swift">
+        <add_import>import CoverCraftShared</add_import>
+        <add_to_method name="segmentMesh">
+          <at_start><![CDATA[
+        Log.segmentation.info("Starting segmentation with target panel count: \(targetPanelCount)")
+        Log.segmentation.debug("Mesh stats - vertices: \(mesh.vertices.count), triangles: \(mesh.triangleCount)")
+          ]]></at_start>
+          <before_return><![CDATA[
+        Log.segmentation.info("Segmentation complete - generated \(panels.count) panels")
+          ]]></before_return>
+        </add_to_method>
+      </modification>
+    </step>
+    
+    <vibe_check id="2">
+      <action>vibe_distill</action>
+      <parameters>
+        <plan>Added logging infrastructure without changing core functionality. Next: improve k-means algorithm while keeping async/actor pattern</plan>
+        <userRequest>Add logging and improve algorithm without breaking existing patterns</userRequest>
+      </parameters>
+      <expected>Keep changes minimal and focused</expected>
+    </vibe_check>
+  </phase>
+
+  <phase id="4" name="Enhance K-means Algorithm">
+    <step order="1">
+      <action>Add k-means++ initialization to MeshSegmentationService</action>
+      <modification path="CoverCraftPackage/Sources/CoverCraftSegmentation/MeshSegmentationService.swift">
+        <add_method><![CDATA[
+    /// K-means++ initialization for better clustering
+    private func kMeansPlusPlusInit(
+        normals: [SIMD3<Float>], 
+        k: Int, 
+        seed: UInt64 = 42
+    ) -> [SIMD3<Float>] {
+        var rng = SeededRandom(seed: seed)
+        var centers: [SIMD3<Float>] = []
+        
+        // Choose first center randomly
+        guard let first = normals.randomElement(using: &rng) else { 
+            return centers 
+        }
+        centers.append(simd_normalize(first))
+        
+        // Choose remaining centers with probability proportional to squared distance
+        while centers.count < k {
+            var distances: [Float] = []
+            for normal in normals {
+                let minDist = centers.map { 
+                    1.0 - max(-1.0, min(1.0, simd_dot(simd_normalize(normal), $0)))
+                }.min() ?? 1.0
+                distances.append(minDist * minDist)
+            }
+            
+            let totalDist = distances.reduce(0, +)
+            guard totalDist > 0 else { break }
+            
+            let threshold = Float.random(in: 0..<totalDist, using: &rng)
+            var sum: Float = 0
+            for (index, distance) in distances.enumerated() {
+                sum += distance
+                if sum >= threshold {
+                    centers.append(simd_normalize(normals[index]))
+                    break
+                }
+            }
+        }
+        
+        Log.segmentation.debug("K-means++ initialized \(centers.count) centers")
+        return centers
+    }
+    
+    /// Seeded random number generator for reproducible results
+    private struct SeededRandom: RandomNumberGenerator {
+        private var state: UInt64
+        
+        init(seed: UInt64) {
+            self.state = seed
+        }
+        
+        mutating func next() -> UInt64 {
+            state &+= 0x9E3779B97F4A7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+            z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+            return z ^ (z >> 31)
+        }
+    }
+        ]]></add_method>
+        
+        <replace_in_method name="performKMeansClustering">
+          <old><![CDATA[
+        // Initialize cluster centers randomly
+        var centers = Array(normals.shuffled().prefix(clusterCount))
+          ]]></old>
+          <new><![CDATA[
+        // Initialize cluster centers using k-means++
+        var centers = kMeansPlusPlusInit(normals: normals, k: clusterCount)
+          ]]></new>
+        </replace_in_method>
+      </modification>
+    </step>
+    
+    <verify>
+      <command>swift test --package-path CoverCraftPackage</command>
+      <expected>All tests should pass with improved algorithm</expected>
+    </verify>
+  </phase>
+
+  <phase id="5" name="Add Dependency Management">
+    <step order="1">
+      <action>Create dependency manifest</action>
+      <file path="CoverCraftPackage/Dependencies.json">
+        <content><![CDATA[
+{
+  "metadata": {
+    "lastAudit": "2025-08-09",
+    "auditSchedule": "weekly",
+    "swiftVersion": "6.0",
+    "minimumIOS": "18.0"
+  },
+  "dependencies": {
+    "internal": {
+      "description": "No external dependencies - using only Apple frameworks",
+      "frameworks": [
+        {
+          "name": "SwiftUI",
+          "version": "iOS 18.0+",
+          "usage": "UI framework"
+        },
+        {
+          "name": "RealityKit",
+          "version": "iOS 18.0+",
+          "usage": "AR/LiDAR scanning"
+        },
+        {
+          "name": "ARKit",
+          "version": "iOS 18.0+",
+          "usage": "AR session management"
+        },
+        {
+          "name": "os.Logger",
+          "version": "iOS 14.0+",
+          "usage": "Structured logging"
+        }
+      ]
+    },
+    "planned": {
+      "description": "Future dependencies to consider",
+      "packages": [
+        {
+          "name": "swift-snapshot-testing",
+          "version": "1.17.0",
+          "purpose": "Contract testing",
+          "status": "evaluation"
+        }
+      ]
+    }
+  },
+  "security": {
+    "lastSecurityScan": "2025-08-09",
+    "vulnerabilities": []
+  }
+}
+        ]]></content>
+      </file>
+    </step>
+    
+    <step order="2">
+      <action>Add dependency audit script</action>
+      <file path="Scripts/audit-dependencies.sh">
+        <content><![CDATA[
+#!/bin/bash
+# Dependency audit script for CoverCraft
+
+echo "🔍 Auditing CoverCraft dependencies..."
+
+# Check Swift version
+SWIFT_VERSION=$(swift --version | grep -o 'Swift version [0-9.]*' | grep -o '[0-9.]*')
+echo "✓ Swift version: $SWIFT_VERSION"
+
+# Check Xcode version
+XCODE_VERSION=$(xcodebuild -version | head -1)
+echo "✓ Xcode: $XCODE_VERSION"
+
+# Check for outdated packages (when we add external deps)
+if [ -f "Package.resolved" ]; then
+    echo "📦 Checking for outdated packages..."
+    swift package update --dry-run
+fi
+
+# Update audit timestamp
+DATE=$(date -u +"%Y-%m-%d")
+sed -i '' "s/\"lastAudit\": \".*\"/\"lastAudit\": \"$DATE\"/" CoverCraftPackage/Dependencies.json
+
+echo "✅ Audit complete"
+        ]]></content>
+      </file>
+      <command>chmod +x Scripts/audit-dependencies.sh</command>
+    </step>
+  </phase>
+
+  <phase id="6" name="Add Contract and Regression Tests">
+    <step order="1">
+      <action>Create contract tests directory structure</action>
+      <commands>
+        mkdir -p CoverCraftPackage/Tests/CoverCraftContractTests
+        mkdir -p CoverCraftPackage/Tests/CoverCraftRegressionTests
+        mkdir -p CoverCraftPackage/Tests/Fixtures
+      </commands>
+    </step>
+    
+    <step order="2">
+      <action>Add contract tests for service boundaries</action>
+      <file path="CoverCraftPackage/Tests/CoverCraftContractTests/SegmentationContractTests.swift">
+        <content><![CDATA[
+import Testing
+import Foundation
+@testable import CoverCraftCore
+@testable import CoverCraftSegmentation
+
+@Suite("Segmentation Service Contract Tests")
+struct SegmentationContractTests {
+    
+    @Test("Input contract: Mesh structure remains stable")
+    func meshInputContract() throws {
+        // This test ensures the Mesh structure doesn't change unexpectedly
+        let mesh = Mesh(
+            vertices: [SIMD3<Float>(0, 0, 0)],
+            triangleIndices: [0, 1, 2]
+        )
+        
+        // Verify expected properties exist
+        #expect(mesh.vertices.count == 1)
+        #expect(mesh.triangleIndices.count == 3)
+        #expect(mesh.triangleCount == 1)
+    }
+    
+    @Test("Output contract: Panel structure remains stable")
+    func panelOutputContract() async throws {
+        let service = MeshSegmentationService()
+        let mesh = TestMeshFactory.createSimpleTriangle()
+        
+        let panels = try await service.segmentMesh(mesh, targetPanelCount: 1)
+        
+        // Verify Panel structure
+        #expect(panels.count >= 1)
+        let panel = panels[0]
+        #expect(panel.vertexIndices.count > 0)
+        #expect(panel.triangleIndices.count > 0)
+        #expect(panel.color != nil)
+        #expect(panel.isValid == true)
+    }
+    
+    @Test("Service contract: Error types remain stable")
+    func errorContract() async {
+        let service = MeshSegmentationService()
+        let emptyMesh = Mesh(vertices: [], triangleIndices: [])
+        
+        do {
+            _ = try await service.segmentMesh(emptyMesh, targetPanelCount: 5)
+            Issue.record("Expected error for empty mesh")
+        } catch let error as MeshSegmentationService.SegmentationError {
+            #expect(error.errorDescription != nil)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+}
+
+// Test fixture factory
+enum TestMeshFactory {
+    static func createSimpleTriangle() -> Mesh {
+        Mesh(
+            vertices: [
+                SIMD3<Float>(0, 0, 0),
+                SIMD3<Float>(1, 0, 0),
+                SIMD3<Float>(0, 1, 0)
+            ],
+            triangleIndices: [0, 1, 2]
+        )
+    }
+}
+        ]]></content>
+      </file>
+    </step>
+    
+    <step order="3">
+      <action>Add regression test with historical data</action>
+      <file path="CoverCraftPackage/Tests/CoverCraftRegressionTests/SegmentationRegressionTests.swift">
+        <content><![CDATA[
+import Testing
+import Foundation
+@testable import CoverCraftCore
+@testable import CoverCraftSegmentation
+
+@Suite("Segmentation Regression Tests")
+struct SegmentationRegressionTests {
+    
+    @Test("Cube segmentation produces consistent results")
+    func cubeSegmentationRegression() async throws {
+        let service = MeshSegmentationService()
+        let cube = TestMeshFactory.createUnitCube()
+        
+        // Historical expectation: cube with 6 target panels should produce 6 panels
+        let panels = try await service.segmentMesh(cube, targetPanelCount: 6)
+        
+        #expect(panels.count == 6, "Expected 6 panels for cube, got \(panels.count)")
+        
+        // Verify each panel has reasonable vertex count (4-8 vertices per face)
+        for panel in panels {
+            #expect(panel.vertexIndices.count >= 4)
+            #expect(panel.vertexIndices.count <= 8)
+        }
+    }
+    
+    @Test("Performance: Large mesh completes within time limit")
+    func largeMeshPerformance() async throws {
+        let service = MeshSegmentationService()
+        let largeMesh = TestMeshFactory.createLargeMesh(vertexCount: 10000)
+        
+        let startTime = CFAbsoluteTimeGetCurrent()
+        _ = try await service.segmentMesh(largeMesh, targetPanelCount: 15)
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        
+        #expect(elapsed < 5.0, "Segmentation took \(elapsed)s, expected < 5s")
+    }
+}
+
+extension TestMeshFactory {
+    static func createUnitCube() -> Mesh {
+        let vertices: [SIMD3<Float>] = [
+            SIMD3<Float>(-1, -1, -1), SIMD3<Float>( 1, -1, -1),
+            SIMD3<Float>( 1,  1, -1), SIMD3<Float>(-1,  1, -1),
+            SIMD3<Float>(-1, -1,  1), SIMD3<Float>( 1, -1,  1),
+            SIMD3<Float>( 1,  1,  1), SIMD3<Float>(-1,  1,  1)
+        ]
+        let triangles: [Int] = [
+            0, 1, 2,  0, 2, 3,  // Front
+            4, 6, 5,  4, 7, 6,  // Back
+            0, 3, 7,  0, 7, 4,  // Left
+            1, 5, 6,  1, 6, 2,  // Right
+            3, 2, 6,  3, 6, 7,  // Top
+            0, 4, 5,  0, 5, 1   // Bottom
+        ]
+        return Mesh(vertices: vertices, triangleIndices: triangles)
+    }
+    
+    static func createLargeMesh(vertexCount: Int) -> Mesh {
+        // Generate a sphere-like mesh for performance testing
+        var vertices: [SIMD3<Float>] = []
+        var triangles: [Int] = []
+        
+        // Simple sphere generation
+        let radius: Float = 1.0
+        let stacks = Int(sqrt(Double(vertexCount)))
+        let slices = stacks
+        
+        for i in 0...stacks {
+            let phi = Float.pi * Float(i) / Float(stacks)
+            for j in 0...slices {
+                let theta = 2 * Float.pi * Float(j) / Float(slices)
+                let x = radius * sin(phi) * cos(theta)
+                let y = radius * sin(phi) * sin(theta)
+                let z = radius * cos(phi)
+                vertices.append(SIMD3<Float>(x, y, z))
+            }
+        }
+        
+        // Generate triangles
+        for i in 0..<stacks {
+            for j in 0..<slices {
+                let first = i * (slices + 1) + j
+                let second = first + slices + 1
+                
+                triangles.append(first)
+                triangles.append(second)
+                triangles.append(first + 1)
+                
+                triangles.append(second)
+                triangles.append(second + 1)
+                triangles.append(first + 1)
+            }
+        }
+        
+        return Mesh(vertices: vertices, triangleIndices: triangles)
+    }
+}
+        ]]></content>
+      </file>
+    </step>
+    
+    <vibe_check id="3">
+      <action>vibe_check</action>
+      <parameters>
+        <plan>Added comprehensive testing without over-engineering. Keeping focus on practical tests that catch real issues</plan>
+        <userRequest>Add contract and regression tests for stability</userRequest>
+        <confidence>0.85</confidence>
+        <phase>implementation</phase>
+      </parameters>
+    </vibe_check>
+  </phase>
+
+  <phase id="7" name="Add CI/CD Configuration">
+    <step order="1">
+      <action>Create GitHub Actions workflow</action>
+      <file path=".github/workflows/ci.yml">
+        <content><![CDATA[
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-14
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_16.0.app
+    
+    - name: Build Package
+      run: |
+        cd CoverCraftPackage
+        swift build
+    
+    - name: Run Tests
+      run: |
+        cd CoverCraftPackage
+        swift test
+    
+    - name: Build iOS App
+      run: |
+        xcodebuild build \
+          -workspace CoverCraft.xcworkspace \
+          -scheme CoverCraft \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO
+    
+    - name: Audit Dependencies
+      run: |
+        if [ -f "Scripts/audit-dependencies.sh" ]; then
+          ./Scripts/audit-dependencies.sh
+        fi
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-14
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run SwiftLint
+      run: |
+        if which swiftlint >/dev/null; then
+          swiftlint --strict
+        else
+          echo "SwiftLint not installed, skipping"
+        fi
+        ]]></content>
+      </file>
+    </step>
+    
+    <step order="2">
+      <action>Add SwiftLint configuration</action>
+      <file path=".swiftlint.yml">
+        <content><![CDATA[
+included:
+  - CoverCraftPackage/Sources
+  - CoverCraftPackage/Tests
+  
+excluded:
+  - .build
+  - DerivedData
+  
+opt_in_rules:
+  - empty_count
+  - closure_end_indentation
+  - sorted_imports
+  - strict_fileprivate
+  - redundant_nil_coalescing
+  
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  
+type_body_length:
+  warning: 300
+  error: 500
+  
+function_body_length:
+  warning: 50
+  error: 100
+  
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+        ]]></content>
+      </file>
+    </step>
+  </phase>
+
+  <phase id="8" name="Final Verification">
+    <step order="1">
+      <action>Run complete test suite</action>
+      <commands>
+        <command>cd CoverCraftPackage && swift test</command>
+        <command>xcodebuild test -workspace CoverCraft.xcworkspace -scheme CoverCraft -destination 'platform=iOS Simulator,name=iPhone 16'</command>
+      </commands>
+      <verify>All tests should pass</verify>
+    </step>
+    
+    <step order="2">
+      <action>Check test coverage</action>
+      <command>
+        xcodebuild test \
+          -workspace CoverCraft.xcworkspace \
+          -scheme CoverCraft \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
+          -enableCodeCoverage YES
+      </command>
+      <verify>Coverage should be > 70% (aiming for 90% in future iterations)</verify>
+    </step>
+    
+    <step order="3">
+      <action>Verify no regressions</action>
+      <checklist>
+        <item>App builds without errors</item>
+        <item>All existing features work (scan, calibrate, segment, export)</item>
+        <item>No ViewModels were added</item>
+        <item>Async/await patterns preserved</item>
+        <item>Actor isolation maintained</item>
+        <item>@Observable pattern still used (not ObservableObject)</item>
+        <item>Swift Testing framework used (not XCTest for new tests)</item>
+      </checklist>
+    </step>
+    
+    <vibe_check id="4">
+      <action>vibe_check</action>
+      <parameters>
+        <plan>Migration complete. Improved organization, added logging, enhanced algorithm, maintained modern patterns</plan>
+        <userRequest>Improve CoverCraft architecture while preserving what works</userRequest>
+        <confidence>0.95</confidence>
+        <phase>review</phase>
+      </parameters>
+      <expected_feedback>Good balance of improvements without over-engineering</expected_feedback>
+    </vibe_check>
+  </phase>
+
+  <completion_criteria>
+    <criterion>✅ Package reorganized into logical modules</criterion>
+    <criterion>✅ Logging infrastructure added</criterion>
+    <criterion>✅ K-means++ algorithm integrated</criterion>
+    <criterion>✅ Contract tests added</criterion>
+    <criterion>✅ Regression tests added</criterion>
+    <criterion>✅ CI/CD pipeline configured</criterion>
+    <criterion>✅ Dependency management documented</criterion>
+    <criterion>✅ No breaking changes to existing functionality</criterion>
+    <criterion>✅ Modern Swift patterns preserved</criterion>
+    <criterion>✅ No unnecessary abstractions added</criterion>
+  </completion_criteria>
+
+  <warnings>
+    <warning priority="HIGH">
+      DO NOT add ViewModels - keep state management in SwiftUI views
+    </warning>
+    <warning priority="HIGH">
+      DO NOT remove async/await or actor isolation
+    </warning>
+    <warning priority="HIGH">
+      DO NOT change @Observable to ObservableObject
+    </warning>
+    <warning priority="MEDIUM">
+      DO NOT add external dependencies unless absolutely necessary
+    </warning>
+    <warning priority="MEDIUM">
+      DO NOT over-engineer - keep solutions simple and maintainable
+    </warning>
+  </warnings>
+</migration_instructions>

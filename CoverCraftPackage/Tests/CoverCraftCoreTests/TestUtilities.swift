@@ -1,0 +1,52 @@
+import simd
+@testable import CoverCraftCore
+
+// MARK: - Test Utilities
+
+func createTestCubeMesh() -> Mesh {
+    // Create a simple cube mesh for testing
+    let vertices: [SIMD3<Float>] = [
+        SIMD3<Float>(-1, -1, -1), // 0
+        SIMD3<Float>( 1, -1, -1), // 1
+        SIMD3<Float>( 1,  1, -1), // 2
+        SIMD3<Float>(-1,  1, -1), // 3
+        SIMD3<Float>(-1, -1,  1), // 4
+        SIMD3<Float>( 1, -1,  1), // 5
+        SIMD3<Float>( 1,  1,  1), // 6
+        SIMD3<Float>(-1,  1,  1)  // 7
+    ]
+    
+    let triangles: [Int] = [
+        // Front face
+        0, 1, 2,  0, 2, 3,
+        // Back face
+        4, 6, 5,  4, 7, 6,
+        // Left face
+        0, 3, 7,  0, 7, 4,
+        // Right face
+        1, 5, 6,  1, 6, 2,
+        // Top face
+        3, 2, 6,  3, 6, 7,
+        // Bottom face
+        0, 4, 5,  0, 5, 1
+    ]
+    
+    return Mesh(vertices: vertices, triangleIndices: triangles)
+}
+
+func createTestPlaneMesh() -> Mesh {
+    // Create a simple square plane mesh
+    let vertices: [SIMD3<Float>] = [
+        SIMD3<Float>(0, 0, 0),
+        SIMD3<Float>(1, 0, 0),
+        SIMD3<Float>(1, 1, 0),
+        SIMD3<Float>(0, 1, 0)
+    ]
+    
+    let triangles: [Int] = [
+        0, 1, 2,
+        0, 2, 3
+    ]
+    
+    return Mesh(vertices: vertices, triangleIndices: triangles)
+}
