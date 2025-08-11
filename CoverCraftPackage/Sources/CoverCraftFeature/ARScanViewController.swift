@@ -109,35 +109,87 @@ public final class ARScanViewController: UIViewController {
     }
     
     private func buildMeshFromAnchors() -> Mesh {
-        // For now, create a simple test cube mesh
-        // In a real implementation, this would process the actual ARMeshAnchor data
-        let vertices: [SIMD3<Float>] = [
-            SIMD3<Float>(-0.5, -0.5, -0.5), // 0
-            SIMD3<Float>( 0.5, -0.5, -0.5), // 1
-            SIMD3<Float>( 0.5,  0.5, -0.5), // 2
-            SIMD3<Float>(-0.5,  0.5, -0.5), // 3
-            SIMD3<Float>(-0.5, -0.5,  0.5), // 4
-            SIMD3<Float>( 0.5, -0.5,  0.5), // 5
-            SIMD3<Float>( 0.5,  0.5,  0.5), // 6
-            SIMD3<Float>(-0.5,  0.5,  0.5)  // 7
-        ]
+        guard !collectedMeshAnchors.isEmpty else {
+            // Return test cube for simulator/testing
+            let vertices: [SIMD3<Float>] = [
+                SIMD3<Float>(-0.5, -0.5, -0.5), SIMD3<Float>( 0.5, -0.5, -0.5),
+                SIMD3<Float>( 0.5,  0.5, -0.5), SIMD3<Float>(-0.5,  0.5, -0.5),
+                SIMD3<Float>(-0.5, -0.5,  0.5), SIMD3<Float>( 0.5, -0.5,  0.5),
+                SIMD3<Float>( 0.5,  0.5,  0.5), SIMD3<Float>(-0.5,  0.5,  0.5)
+            ]
+            
+            let triangles: [Int] = [
+                0, 1, 2,  0, 2, 3,  4, 6, 5,  4, 7, 6,  0, 3, 7,  0, 7, 4,
+                1, 5, 6,  1, 6, 2,  3, 2, 6,  3, 6, 7,  0, 4, 5,  0, 5, 1
+            ]
+            
+            return Mesh(vertices: vertices, triangleIndices: triangles)
+        }
         
-        let triangles: [Int] = [
-            // Front face
-            0, 1, 2,  0, 2, 3,
-            // Back face
-            4, 6, 5,  4, 7, 6,
-            // Left face
-            0, 3, 7,  0, 7, 4,
-            // Right face
-            1, 5, 6,  1, 6, 2,
-            // Top face
-            3, 2, 6,  3, 6, 7,
-            // Bottom face
-            0, 4, 5,  0, 5, 1
-        ]
+        let vertexWelder = VertexWelder(quantization: 0.001) // 1mm precision
+        var globalTriangles: [Int] = []
         
-        return Mesh(vertices: vertices, triangleIndices: triangles)
+        // Process each ARMeshAnchor
+        for meshAnchor in collectedMeshAnchors.values {
+            let transform = meshAnchor.transform
+            let geometry = meshAnchor.geometry
+            
+            // Extract vertices and convert to global coordinates
+            let vertexBuffer = geometry.vertices
+            let vertexCount = vertexBuffer.count
+            
+            guard vertexCount > 0 else { continue }
+            
+            let vertexPointer = vertexBuffer.buffer.contents().bindMemory(to: SIMD3<Float>.self, capacity: vertexCount)
+            let vertexBufferPointer = UnsafeBufferPointer(start: vertexPointer, count: vertexCount)
+            
+            var localVertices: [SIMD3<Float>] = []
+            for i in 0..<vertexCount {
+                let localVertex = vertexBufferPointer[i]
+                let globalVertex = (transform * SIMD4<Float>(localVertex.x, localVertex.y, localVertex.z, 1.0)).xyz
+                localVertices.append(globalVertex)
+            }
+            
+            // Extract face indices
+            let faceBuffer = geometry.faces
+            let faceCount = faceBuffer.count
+            
+            guard faceCount > 0 else { continue }
+            
+            let facePointer = faceBuffer.buffer.contents().bindMemory(to: UInt32.self, capacity: faceCount * 3)
+            let faceBufferPointer = UnsafeBufferPointer(start: facePointer, count: faceCount * 3)
+            
+            // Add vertices to welder and build triangle indices
+            var localToGlobalMap: [Int] = []
+            for vertex in localVertices {
+                let globalIndex = vertexWelder.addVertex(vertex)
+                localToGlobalMap.append(globalIndex)
+            }
+            
+            // Build triangles with proper winding order
+            for faceIndex in 0..<faceCount {
+                let baseIdx = faceIndex * 3
+                let i0 = Int(faceBufferPointer[baseIdx])
+                let i1 = Int(faceBufferPointer[baseIdx + 1])
+                let i2 = Int(faceBufferPointer[baseIdx + 2])
+                
+                guard i0 < localToGlobalMap.count,
+                      i1 < localToGlobalMap.count,
+                      i2 < localToGlobalMap.count else { continue }
+                
+                // Convert to global indices
+                let globalI0 = localToGlobalMap[i0]
+                let globalI1 = localToGlobalMap[i1]
+                let globalI2 = localToGlobalMap[i2]
+                
+                // Add triangle with consistent winding (counter-clockwise when viewed from outside)
+                globalTriangles.append(globalI0)
+                globalTriangles.append(globalI1)
+                globalTriangles.append(globalI2)
+            }
+        }
+        
+        return Mesh(vertices: vertexWelder.getVertices(), triangleIndices: globalTriangles)
     }
     
     private func showError(_ message: String) {
@@ -230,4 +282,55 @@ extension ARScanViewController: ARSessionDelegate {
         }
     }
 }
+
+// MARK: - Vertex Welding and Quantization Helpers
+
+/// Helper class for vertex welding with quantization grid
+private class VertexWelder {
+    private var quantizedVertices: [QuantizedKey: Int] = [:]
+    private var uniqueVertices: [SIMD3<Float>] = []
+    private let quantization: Float
+    
+    init(quantization: Float) {
+        self.quantization = quantization
+    }
+    
+    /// Add vertex and return its global index (welds duplicates)
+    func addVertex(_ vertex: SIMD3<Float>) -> Int {
+        let key = QuantizedKey(vertex: vertex, quantization: quantization)
+        
+        if let existingIndex = quantizedVertices[key] {
+            return existingIndex
+        } else {
+            let newIndex = uniqueVertices.count
+            uniqueVertices.append(vertex)
+            quantizedVertices[key] = newIndex
+            return newIndex
+        }
+    }
+    
+    func getVertices() -> [SIMD3<Float>] {
+        return uniqueVertices
+    }
+}
+
+/// Quantized vertex key for welding duplicates
+private struct QuantizedKey: Hashable {
+    let x, y, z: Int
+    
+    init(vertex: SIMD3<Float>, quantization: Float) {
+        // Convert to quantized integer coordinates
+        x = Int(round(vertex.x / quantization))
+        y = Int(round(vertex.y / quantization))
+        z = Int(round(vertex.z / quantization))
+    }
+}
+
+/// Extension to extract xyz from homogeneous coordinates
+private extension SIMD4<Float> {
+    var xyz: SIMD3<Float> {
+        return SIMD3<Float>(x, y, z)
+    }
+}
+
 #endif

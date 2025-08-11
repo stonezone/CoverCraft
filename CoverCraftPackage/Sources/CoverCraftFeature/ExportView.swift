@@ -181,19 +181,6 @@ public struct ExportView: View {
     }
     
     private func exportPattern() {
-        guard flattenedPanels != nil else { return }
-        
-        isExporting = true
-        exportMessage = nil
-        
-        // Simulate export process
-        Task {
-            try await Task.sleep(for: .seconds(2))
-            
-            await MainActor.run {
-                exportMessage = "Pattern exported successfully to Files app"
-                isExporting = false
-            }
-        }
-    }
+        guard let panels = flattenedPanels else { return    }
+}
 }
