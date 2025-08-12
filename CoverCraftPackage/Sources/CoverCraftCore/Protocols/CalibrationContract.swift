@@ -6,6 +6,7 @@ import CoverCraftDTO
 import simd
 
 /// Contract for calibration data management
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public protocol CalibrationContract: AnyObject, Sendable {
     /// Current calibration state
@@ -34,7 +35,7 @@ public protocol CalibrationContract: AnyObject, Sendable {
 }
 
 /// Contract for AR-based calibration operations
-@available(iOS 18.0, macOS 10.15, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol ARCalibrationContract: Actor {
     /// Perform hit test to find mesh intersection point
     /// - Parameters:

@@ -8,7 +8,7 @@ import simd
 /// 
 /// This DTO is designed for stable serialization and transfer between modules.
 /// Breaking changes require a version bump and migration path.
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct CalibrationDTO: Sendable, Codable, Equatable {
     
     // MARK: - Properties
@@ -245,7 +245,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
 }
 
 /// Metadata for calibration data
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct CalibrationMetadata: Sendable, Codable, Equatable {
     
     /// User-provided description of what was measured

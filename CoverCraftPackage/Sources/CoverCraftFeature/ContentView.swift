@@ -7,6 +7,7 @@ import CoverCraftFlattening
 import CoverCraftExport
 import CoverCraftUI
 
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct ContentView: View {
     // MARK: - State
@@ -31,7 +32,12 @@ public struct ContentView: View {
             }
             .navigationTitle("CoverCraft")
             .sheet(isPresented: $showingScanner) {
+                #if canImport(UIKit)
                 ARScanView(scannedMesh: $appState.currentMesh)
+                #else
+                Text("AR Scanning not available on this platform")
+                    .padding()
+                #endif
             }
             .sheet(isPresented: $showingHelp) {
                 HelpView()
@@ -53,12 +59,12 @@ public struct ContentView: View {
                 Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
             }
             
-            if let mesh = appState.currentMesh {
+            if let meshDTO = appState.currentMesh {
                 HStack {
-                    Label("Vertices: \(mesh.vertices.count)", systemImage: "cube")
+                    Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
                         .font(.caption)
                     Spacer()
-                    Label("Triangles: \(mesh.triangleCount)", systemImage: "triangle")
+                    Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
                         .font(.caption)
                 }
                 .foregroundColor(.secondary)
@@ -164,7 +170,7 @@ public struct ContentView: View {
         Task {
             do {
                 // Generate pattern
-                let segmenter = MeshSegmentationService()
+                let segmenter = DefaultMeshSegmentationService()
                 let flattener = PatternFlattener()
                 
                 let scaledMesh = appState.currentMesh!.scaled(by: appState.calibrationData.scaleFactor)

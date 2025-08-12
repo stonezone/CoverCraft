@@ -8,7 +8,7 @@ import CoreGraphics
 /// 
 /// This DTO is designed for stable serialization and transfer between modules.
 /// Breaking changes require a version bump and migration path.
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct FlattenedPanelDTO: Sendable, Codable, Equatable, Identifiable {
     
     // MARK: - Properties
@@ -119,7 +119,7 @@ public struct FlattenedPanelDTO: Sendable, Codable, Equatable, Identifiable {
 }
 
 /// Edge data transfer object representing a connection between two points
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct EdgeDTO: Sendable, Codable, Equatable {
     
     // MARK: - Properties
@@ -158,7 +158,7 @@ public struct EdgeDTO: Sendable, Codable, Equatable {
 }
 
 /// Types of edges in a flattened panel
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum EdgeType: String, Sendable, Codable, CaseIterable {
     /// Edge to be cut
     case cutLine = "cut"

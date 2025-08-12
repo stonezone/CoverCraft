@@ -1,5 +1,9 @@
 import SwiftUI
+import SwiftUI
+import CoverCraftCore
+import CoverCraftDTO
 
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct ExportView: View {
     let flattenedPanels: [FlattenedPanel]?
@@ -14,13 +18,8 @@ public struct ExportView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
-            Text("Export Pattern")
-                .font(.largeTitle)
-                .bold()
-            
-            Text("Export your sewing pattern in various formats.")
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+            headerView
+            descriptionView
             
             if let panels = flattenedPanels {
                 // Pattern preview
@@ -42,7 +41,7 @@ public struct ExportView: View {
                         LazyVGrid(columns: Array(repeating: GridItem(.fixed(40)), count: min(panels.count, 6)), spacing: 4) {
                             ForEach(Array(panels.prefix(6).enumerated()), id: \.offset) { index, panel in
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(uiColor: panel.sourcePanel.color))
+                                    .fill(Color(red: panel.color.red, green: panel.color.green, blue: panel.color.blue, opacity: panel.color.alpha))
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Text("\(index + 1)")
@@ -132,7 +131,7 @@ public struct ExportView: View {
                     ForEach(Array(panels.enumerated()), id: \.offset) { index, panel in
                         HStack {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(uiColor: panel.sourcePanel.color))
+                                .fill(Color(red: panel.color.red, green: panel.color.green, blue: panel.color.blue, opacity: panel.color.alpha))
                                 .frame(width: 16, height: 16)
                             
                             Text("Piece \(index + 1)")
@@ -162,7 +161,9 @@ public struct ExportView: View {
         }
         .padding()
         .navigationTitle("Export")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
     
     private func formatDescription(for format: ExportFormat) -> String {
@@ -173,14 +174,27 @@ public struct ExportView: View {
             return "Web-friendly"
         case .svg:
             return "Scalable vector"
-        case .pdfLetter:
-            return "US Letter size"
-        case .pdfA4:
-            return "A4 size"
+        case .pdf:
+            return "PDF document"
+        case .dxf:
+            return "CAD format"
         }
     }
     
     private func exportPattern() {
-        guard let panels = flattenedPanels else { return    }
-}
+        guard let panels = flattenedPanels else { return }
+        // TODO: Implement export functionality
+    }
+    
+    private var headerView: some View {
+        Text("Export Pattern")
+            .font(.largeTitle)
+            .bold()
+    }
+    
+    private var descriptionView: some View {
+        Text("Export your sewing pattern in various formats.")
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+    }
 }

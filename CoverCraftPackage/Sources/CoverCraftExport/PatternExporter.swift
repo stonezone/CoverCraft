@@ -3,20 +3,27 @@ import PDFKit
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
+import CoverCraftDTO
+import CoverCraftCore
 #if canImport(UIKit)
 import UIKit
 typealias PlatformColor = UIColor
+typealias PlatformFont = UIFont
+typealias PlatformImage = UIImage
 #elseif canImport(AppKit)
 import AppKit
 typealias PlatformColor = NSColor
+typealias PlatformFont = NSFont
+typealias PlatformImage = NSImage
 #endif
 
 /// Export patterns to various formats with real-world scaling
-public actor PatternExporter: PatternExporterProtocol {
+@available(iOS 18.0, macOS 15.0, *)
+public actor PatternExporter: PatternExportService {
     
     public init() {}
     
-    public func exportPattern(_ panels: [FlattenedPanel], format: ExportFormat) async throws -> URL {
+    public func exportPattern(_ panels: [FlattenedPanelDTO], format: ExportFormat) async throws -> URL {
         guard !panels.isEmpty else {
             throw ExportError.noPanels
         }
@@ -28,19 +35,47 @@ public actor PatternExporter: PatternExporterProtocol {
             return try await exportToGIF(panels)
         case .svg:
             return try await exportToSVG(panels)
-        case .pdfLetter:
-            return try await exportToPDF(panels, pageSize: .letter)
-        case .pdfA4:
+        case .pdf:
             return try await exportToPDF(panels, pageSize: .a4)
+        case .dxf:
+            return try await exportToDXF(panels)
         }
+    }
+    
+    // MARK: - PatternExportService Protocol Methods
+    
+    public func exportPatterns(_ panels: [FlattenedPanelDTO], format: ExportFormat, options: ExportOptions) async throws -> ExportResult {
+        let url = try await exportPattern(panels, format: format)
+        let data = try Data(contentsOf: url)
+        let filename = url.lastPathComponent
+        return ExportResult(data: data, format: format, filename: filename)
+    }
+    
+    nonisolated public func getSupportedFormats() -> [ExportFormat] {
+        return [.png, .gif, .svg, .pdf]
+    }
+    
+    nonisolated public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
+        if panels.isEmpty {
+            return ExportValidationResult(isValid: false, errors: ["No panels provided for export"])
+        }
+        
+        for panel in panels {
+            if panel.points2D.isEmpty {
+                return ExportValidationResult(isValid: false, errors: ["Panel contains no points"])
+            }
+        }
+        
+        return ExportValidationResult(isValid: true, errors: [])
     }
     
     // MARK: - PNG Export
     
-    private func exportToPNG(_ panels: [FlattenedPanel]) async throws -> URL {
+    private func exportToPNG(_ panels: [FlattenedPanelDTO]) async throws -> URL {
         let layout = layoutPanels(panels, pageSize: .letter, dpi: 150)
         let size = CGSize(width: layout.pageWidth, height: layout.pageHeight)
         
+        #if canImport(UIKit)
         let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { context in
             let cgContext = context.cgContext
@@ -52,25 +87,71 @@ public actor PatternExporter: PatternExporterProtocol {
             // Draw patterns and labels
             drawPatterns(cgContext, layout: layout, includeLabels: true)
         }
+        #else
+        // For macOS, create CGContext manually
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let cgContext = CGContext(
+            data: nil,
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            throw ExportError.fileCreationFailed
+        }
+        
+        cgContext.scaleBy(x: 1.0, y: -1.0)
+        cgContext.translateBy(x: 0.0, y: -size.height)
+        
+        // White background
+        cgContext.setFillColor(PlatformColor.white.cgColor)
+        cgContext.fill(CGRect(origin: .zero, size: size))
+        
+        // Draw patterns and labels
+        drawPatterns(cgContext, layout: layout, includeLabels: true)
+        
+        guard let cgImage = cgContext.makeImage() else {
+            throw ExportError.renderingFailed
+        }
+        let image = PlatformImage(cgImage: cgImage, size: size)
+        #endif
         
         let url = getTemporaryURL(format: .png)
+        
+        #if canImport(UIKit)
         guard let data = image.pngData() else {
             throw ExportError.renderingFailed
         }
-        
         try data.write(to: url)
         return url
+        #else
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+            throw ExportError.renderingFailed
+        }
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw ExportError.renderingFailed
+        }
+        return url
+        #endif
     }
     
     // MARK: - GIF Export
     
-    private func exportToGIF(_ panels: [FlattenedPanel]) async throws -> URL {
+    @available(iOS 18.0, macOS 15.0, *)
+    private func exportToGIF(_ panels: [FlattenedPanelDTO]) async throws -> URL {
+        // GIF export only supported on iOS for now
+        #if canImport(UIKit)
         // Create animated GIF showing panels one by one
         let layout = layoutPanels(panels, pageSize: .letter, dpi: 150)
         let size = CGSize(width: layout.pageWidth, height: layout.pageHeight)
         
         let url = getTemporaryURL(format: .gif)
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, panels.count + 1, nil) else {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "com.compuserve.gif" as CFString, panels.count + 1, nil) else {
             throw ExportError.fileCreationFailed
         }
         
@@ -116,12 +197,16 @@ public actor PatternExporter: PatternExporterProtocol {
         }
         
         return url
+        #else
+        // GIF export not supported on macOS yet
+        throw ExportError.unsupportedFormat
+        #endif
     }
     
     // MARK: - SVG Export
     
-    private func exportToSVG(_ panels: [FlattenedPanel]) async throws -> URL {
-        let layout = layoutPanels(panels, pageSize: PaperSize.letter, dpi: 72) // SVG uses 72 DPI
+    private func exportToSVG(_ panels: [FlattenedPanelDTO]) async throws -> URL {
+        let layout = layoutPanels(panels, pageSize: PageSize.letter, dpi: 72) // SVG uses 72 DPI
         
         var svg = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -141,12 +226,13 @@ public actor PatternExporter: PatternExporterProtocol {
         // Draw panels
         for (panelIndex, panelLayout) in layout.panels.enumerated() {
             let panel = panels[panelIndex]
-            let color = panel.sourcePanel.color
+            let color = panel.color
             
-            // Convert PlatformColor to RGB
-            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-            color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-            let hexColor = String(format: "#%02x%02x%02x", Int(red * 255), Int(green * 255), Int(blue * 255))
+            // Convert ColorDTO to RGB hex
+            let hexColor = String(format: "#%02x%02x%02x", 
+                                Int(color.red * 255), 
+                                Int(color.green * 255), 
+                                Int(color.blue * 255))
             
             // Panel background
             svg += """
@@ -185,11 +271,11 @@ public actor PatternExporter: PatternExporterProtocol {
     
     // MARK: - PDF Export
     
-    private func exportToPDF(_ panels: [FlattenedPanel], pageSize: PageSize) async throws -> URL {
+    private func exportToPDF(_ panels: [FlattenedPanelDTO], pageSize: PageSize) async throws -> URL {
         let layout = layoutPanels(panels, pageSize: pageSize, dpi: 72) // PDF uses 72 DPI
         let bounds = CGRect(x: 0, y: 0, width: layout.pageWidth, height: layout.pageHeight)
         
-        let url = getTemporaryURL(format: pageSize == .letter ? .pdfLetter : .pdfA4)
+        let url = getTemporaryURL(format: .pdf)
         
         var mediaBox = bounds
         guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
@@ -225,11 +311,11 @@ public actor PatternExporter: PatternExporterProtocol {
         }
     }
     
-    private func layoutPanels(_ panels: [FlattenedPanel], pageSize: PageSize, dpi: CGFloat) -> PageLayout {
+    private func layoutPanels(_ panels: [FlattenedPanelDTO], pageSize: PageSize, dpi: CGFloat) -> PageLayout {
         let pageSize = getPageSize(pageSize)
         let margin: CGFloat = 36 // 0.5 inch margin
         let availableWidth = pageSize.width - (2 * margin)
-        let availableHeight = pageSize.height - (2 * margin)
+        let _ = pageSize.height - (2 * margin) // Available height for future use
         
         var panelLayouts: [PageLayout.PanelLayout] = []
         var currentY: CGFloat = margin
@@ -308,7 +394,7 @@ public actor PatternExporter: PatternExporterProtocol {
             if includeLabels {
                 let text = "Panel \(index + 1)"
                 let attributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 12),
+                    .font: PlatformFont.systemFont(ofSize: 12),
                     .foregroundColor: PlatformColor.black
                 ]
                 
@@ -339,7 +425,7 @@ public actor PatternExporter: PatternExporterProtocol {
         if includeLabels {
             let scaleText = "10 cm"
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 10),
+                .font: PlatformFont.systemFont(ofSize: 10),
                 .foregroundColor: PlatformColor.black
             ]
             
@@ -389,8 +475,15 @@ public actor PatternExporter: PatternExporterProtocol {
         
         if includeLabels {
             let text = "Panel \(panelIndex + 1)"
+            
+            #if canImport(UIKit)
+            let boldFont = PlatformFont.systemFont(ofSize: 14, weight: .bold)
+            #else
+            let boldFont = PlatformFont.boldSystemFont(ofSize: 14)
+            #endif
+            
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14, weight: .bold),
+                .font: boldFont,
                 .foregroundColor: PlatformColor.red
             ]
             
@@ -460,13 +553,79 @@ public actor PatternExporter: PatternExporterProtocol {
             filename = "CoverCraft_Pattern_\(timestamp).gif"
         case .svg:
             filename = "CoverCraft_Pattern_\(timestamp).svg"
-        case .pdfLetter:
-            filename = "CoverCraft_Pattern_Letter_\(timestamp).pdf"
-        case .pdfA4:
-            filename = "CoverCraft_Pattern_A4_\(timestamp).pdf"
+        case .pdf:
+            filename = "CoverCraft_Pattern_\(timestamp).pdf"
+        case .dxf:
+            filename = "CoverCraft_Pattern_\(timestamp).dxf"
         }
         
         return FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+    }
+    
+    private func exportToDXF(_ panels: [FlattenedPanelDTO]) async throws -> URL {
+        // For now, provide a basic DXF export stub
+        // TODO: Implement proper DXF export functionality
+        let fileManager = FileManager.default
+        let temporaryDirectory = fileManager.temporaryDirectory
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let timestamp = formatter.string(from: Date())
+        let filename = "CoverCraft_Pattern_\(timestamp).dxf"
+        let fileURL = temporaryDirectory.appendingPathComponent(filename)
+        
+        // Create basic DXF content
+        var dxfContent = """
+        0
+        SECTION
+        2
+        HEADER
+        0
+        ENDSEC
+        0
+        SECTION
+        2
+        ENTITIES
+        """
+        
+        // Add panel entities
+        for panel in panels {
+            for edge in panel.edges {
+                let startPoint = panel.points2D[edge.startIndex]
+                let endPoint = panel.points2D[edge.endIndex]
+                
+                dxfContent += """
+        
+        0
+        LINE
+        8
+        0
+        10
+        \(startPoint.x)
+        20
+        \(startPoint.y)
+        30
+        0.0
+        11
+        \(endPoint.x)
+        21
+        \(endPoint.y)
+        31
+        0.0
+        """
+            }
+        }
+        
+        dxfContent += """
+        
+        0
+        ENDSEC
+        0
+        EOF
+        """
+        
+        try dxfContent.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
     }
     
     public enum PageSize {
@@ -477,6 +636,7 @@ public actor PatternExporter: PatternExporterProtocol {
         case noPanels
         case fileCreationFailed
         case renderingFailed
+        case unsupportedFormat
         
         public var errorDescription: String? {
             switch self {
@@ -486,6 +646,8 @@ public actor PatternExporter: PatternExporterProtocol {
                 return "Failed to create export file"
             case .renderingFailed:
                 return "Failed to render pattern"
+            case .unsupportedFormat:
+                return "Unsupported export format for this platform"
             }
         }
     }

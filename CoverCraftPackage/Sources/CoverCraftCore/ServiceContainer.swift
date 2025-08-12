@@ -139,7 +139,7 @@ public struct DependencyContainerKey: EnvironmentKey {
 }
 
 /// SwiftUI Environment extension for easy access
-@available(iOS 18.0, macOS 10.15, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension EnvironmentValues {
     var dependencyContainer: DependencyContainer {
         get { self[DependencyContainerKey.self] }

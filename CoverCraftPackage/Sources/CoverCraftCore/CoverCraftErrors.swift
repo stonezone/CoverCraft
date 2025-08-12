@@ -13,7 +13,7 @@ public protocol CoverCraftError: Error, LocalizedError, Sendable {
 // MARK: - AR Module Errors
 
 /// Errors related to AR scanning
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum ARScanningError: CoverCraftError {
     case deviceNotSupported
     case cameraPermissionDenied
@@ -62,7 +62,7 @@ public enum ARScanningError: CoverCraftError {
 // MARK: - Segmentation Module Errors
 
 /// Errors related to mesh segmentation
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum SegmentationError: CoverCraftError {
     case invalidMesh(String)
     case segmentationFailed(String)
@@ -107,7 +107,7 @@ public enum SegmentationError: CoverCraftError {
 // MARK: - Flattening Module Errors
 
 /// Errors related to pattern flattening
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum FlatteningError: CoverCraftError {
     case invalidPanel(String)
     case flatteningFailed(String)
@@ -152,7 +152,7 @@ public enum FlatteningError: CoverCraftError {
 // MARK: - Export Module Errors
 
 /// Errors related to pattern export
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum ExportError: CoverCraftError {
     case invalidFormat(String)
     case exportFailed(String)
@@ -201,7 +201,7 @@ public enum ExportError: CoverCraftError {
 // MARK: - Calibration Module Errors
 
 /// Errors related to calibration
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum CalibrationError: CoverCraftError {
     case invalidPoint(String)
     case pointsTooClose
@@ -242,7 +242,7 @@ public enum CalibrationError: CoverCraftError {
 // MARK: - Core Module Errors
 
 /// Errors related to core functionality
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum CoreError: CoverCraftError {
     case dependencyNotFound(String)
     case invalidConfiguration(String)
@@ -282,7 +282,7 @@ public enum CoreError: CoverCraftError {
 
 // MARK: - Error Utilities
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension CoverCraftError {
     /// Full error identifier with module and code
     var fullCode: String {

@@ -5,7 +5,7 @@ import Foundation
 import CoverCraftDTO
 
 /// Contract for mesh segmentation operations
-@available(iOS 18.0, macOS 10.15, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol MeshSegmentationContract: Actor {
     /// Segment mesh into panels using clustering algorithms
     /// - Parameters:
@@ -17,6 +17,7 @@ public protocol MeshSegmentationContract: Actor {
 }
 
 /// Contract for mesh data operations
+@available(iOS 18.0, macOS 15.0, *)
 public protocol MeshDataContract: Sendable {
     /// Convert internal mesh representation to DTO
     func toDTO() -> MeshDTO
@@ -33,7 +34,7 @@ public protocol MeshDataContract: Sendable {
 }
 
 /// Contract for pattern flattening operations
-@available(iOS 18.0, macOS 10.15, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol PatternFlattenerContract: Actor {
     /// Flatten 3D panels into 2D patterns
     /// - Parameter panels: 3D panels to flatten

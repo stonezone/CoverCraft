@@ -3,7 +3,7 @@ import simd
 import Logging
 import CoverCraftDTO
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public final class DefaultCalibrationService: CalibrationService, Sendable {
     
     private let logger = Logger(label: "com.covercraft.calibration")
@@ -34,6 +34,7 @@ public final class DefaultCalibrationService: CalibrationService, Sendable {
 }
 
 // Service Registration
+@available(iOS 18.0, macOS 15.0, *)
 public extension DefaultDependencyContainer {
     func registerCalibrationServices() {
         let logger = Logger(label: "com.covercraft.calibration-registration")

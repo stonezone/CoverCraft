@@ -7,7 +7,7 @@ import CoverCraftDTO
 // MARK: - AR Scanning Services
 
 /// Service for AR-based mesh scanning
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol ARScanningService: Sendable {
     /// Start AR scanning session
     func startScanning() async throws
@@ -23,7 +23,7 @@ public protocol ARScanningService: Sendable {
 }
 
 /// Service for AR session management
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol ARSessionService: Sendable {
     /// Configure AR session
     func configure() async throws
@@ -41,7 +41,7 @@ public protocol ARSessionService: Sendable {
 // MARK: - Mesh Processing Services
 
 /// Service for mesh segmentation into panels
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol MeshSegmentationService: Sendable {
     /// Segment a mesh into panels
     /// - Parameters:
@@ -59,7 +59,7 @@ public protocol MeshSegmentationService: Sendable {
 }
 
 /// Service for pattern flattening
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol PatternFlatteningService: Sendable {
     /// Flatten 3D panels to 2D patterns
     /// - Parameters:
@@ -77,7 +77,7 @@ public protocol PatternFlatteningService: Sendable {
 // MARK: - Calibration Services
 
 /// Service for real-world scale calibration
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol CalibrationService: Sendable {
     /// Create new calibration
     func createCalibration() -> CalibrationDTO
@@ -112,7 +112,7 @@ public protocol CalibrationService: Sendable {
 // MARK: - Export Services
 
 /// Service for pattern export
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public protocol PatternExportService: Sendable {
     /// Export patterns to various formats
     /// - Parameters:
@@ -131,13 +131,13 @@ public protocol PatternExportService: Sendable {
     ///   - panels: Panels to validate
     ///   - format: Target format
     /// - Returns: Validation result
-    func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult
+    func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult
 }
 
 // MARK: - Support Types
 
 /// Segmentation resolution levels
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum SegmentationResolution: String, CaseIterable, Sendable, Codable {
     case low = "Low (5 panels)"
     case medium = "Medium (6-10 panels)"
@@ -153,7 +153,7 @@ public enum SegmentationResolution: String, CaseIterable, Sendable, Codable {
 }
 
 /// Export formats
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case pdf = "PDF"
     case svg = "SVG"
@@ -167,7 +167,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
 }
 
 /// Export options
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct ExportOptions: Sendable, Codable, Equatable {
     public let includeSeamAllowance: Bool
     public let seamAllowanceWidth: Double // in millimeters
@@ -194,7 +194,7 @@ public struct ExportOptions: Sendable, Codable, Equatable {
 }
 
 /// Paper sizes for export
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public enum PaperSize: String, CaseIterable, Sendable, Codable {
     case a4 = "A4"
     case a3 = "A3"
@@ -214,7 +214,7 @@ public enum PaperSize: String, CaseIterable, Sendable, Codable {
 }
 
 /// Export result
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct ExportResult: Sendable {
     public let data: Data
     public let format: ExportFormat
@@ -229,9 +229,9 @@ public struct ExportResult: Sendable {
     }
 }
 
-/// Validation result
-@available(iOS 18.0, *)
-public struct ValidationResult: Sendable {
+/// Export validation result (simplified)
+@available(iOS 18.0, macOS 15.0, *)
+public struct ExportValidationResult: Sendable {
     public let isValid: Bool
     public let errors: [String]
     public let warnings: [String]
@@ -241,4 +241,169 @@ public struct ValidationResult: Sendable {
         self.errors = errors
         self.warnings = warnings
     }
+}
+
+// MARK: - Pattern Validation Services
+
+/// Service for comprehensive pattern validation
+@available(iOS 18.0, macOS 15.0, *)
+public protocol PatternValidationService: Sendable {
+    /// Validate a single flattened panel
+    /// - Parameter panel: Panel to validate
+    /// - Returns: Detailed validation result
+    func validatePanel(_ panel: FlattenedPanelDTO) async -> PatternValidationResult
+    
+    /// Validate multiple panels for layout compatibility
+    /// - Parameter panels: Panels to validate as a set
+    /// - Returns: Comprehensive validation result
+    func validatePanelSet(_ panels: [FlattenedPanelDTO]) async -> PatternSetValidationResult
+    
+    /// Validate fabric utilization efficiency
+    /// - Parameters:
+    ///   - panels: Panels to analyze
+    ///   - fabricWidth: Available fabric width in millimeters
+    /// - Returns: Utilization analysis result
+    func validateFabricUtilization(_ panels: [FlattenedPanelDTO], fabricWidth: Double) -> FabricUtilizationResult
+}
+
+/// Detailed pattern validation result
+@available(iOS 18.0, macOS 15.0, *)
+public struct PatternValidationResult: Sendable {
+    public let isValid: Bool
+    public let issues: [ValidationIssue]
+    public let warnings: [ValidationWarning]
+    public let panelId: UUID?
+    public let validatedAt: Date
+    
+    public init(isValid: Bool, issues: [ValidationIssue], warnings: [ValidationWarning], panelId: UUID?, validatedAt: Date) {
+        self.isValid = isValid
+        self.issues = issues
+        self.warnings = warnings
+        self.panelId = panelId
+        self.validatedAt = validatedAt
+    }
+}
+
+/// Pattern set validation result
+@available(iOS 18.0, macOS 15.0, *)
+public struct PatternSetValidationResult: Sendable {
+    public let isValid: Bool
+    public let panelResults: [PatternValidationResult]
+    public let layoutIssues: [ValidationIssue]
+    public let fabricCompatibility: FabricCompatibilityResult?
+    public let totalArea: Double
+    public let recommendedFabricWidth: Double?
+    public let validatedAt: Date
+    
+    public init(isValid: Bool, panelResults: [PatternValidationResult], layoutIssues: [ValidationIssue], fabricCompatibility: FabricCompatibilityResult?, totalArea: Double, recommendedFabricWidth: Double?, validatedAt: Date) {
+        self.isValid = isValid
+        self.panelResults = panelResults
+        self.layoutIssues = layoutIssues
+        self.fabricCompatibility = fabricCompatibility
+        self.totalArea = totalArea
+        self.recommendedFabricWidth = recommendedFabricWidth
+        self.validatedAt = validatedAt
+    }
+}
+
+/// Validation issue detail
+@available(iOS 18.0, macOS 15.0, *)
+public struct ValidationIssue: Sendable {
+    public let severity: ValidationSeverity
+    public let type: ValidationIssueType
+    public let message: String
+    public let panelId: UUID?
+    public let location: CGPoint?
+    
+    public init(severity: ValidationSeverity, type: ValidationIssueType, message: String, panelId: UUID?, location: CGPoint?) {
+        self.severity = severity
+        self.type = type
+        self.message = message
+        self.panelId = panelId
+        self.location = location
+    }
+}
+
+/// Validation warning detail
+@available(iOS 18.0, macOS 15.0, *)
+public struct ValidationWarning: Sendable {
+    public let type: ValidationWarningType
+    public let message: String
+    public let panelId: UUID?
+    public let location: CGPoint?
+    
+    public init(type: ValidationWarningType, message: String, panelId: UUID?, location: CGPoint?) {
+        self.type = type
+        self.message = message
+        self.panelId = panelId
+        self.location = location
+    }
+}
+
+/// Fabric compatibility result
+@available(iOS 18.0, macOS 15.0, *)
+public struct FabricCompatibilityResult: Sendable {
+    public let compatibleWidths: [Double]
+    public let recommendedWidth: Double?
+    public let issues: [String]
+    public let requiresCustomWidth: Bool
+    
+    public init(compatibleWidths: [Double], recommendedWidth: Double?, issues: [String], requiresCustomWidth: Bool) {
+        self.compatibleWidths = compatibleWidths
+        self.recommendedWidth = recommendedWidth
+        self.issues = issues
+        self.requiresCustomWidth = requiresCustomWidth
+    }
+}
+
+/// Fabric utilization analysis
+@available(iOS 18.0, macOS 15.0, *)
+public struct FabricUtilizationResult: Sendable {
+    public let totalPanelArea: Double
+    public let totalFabricArea: Double
+    public let efficiency: Double
+    public let requiredFabricLength: Double
+    public let oversizedPanels: [UUID]
+    public let isEfficient: Bool
+    public let recommendations: [String]
+    
+    public init(totalPanelArea: Double, totalFabricArea: Double, efficiency: Double, requiredFabricLength: Double, oversizedPanels: [UUID], isEfficient: Bool, recommendations: [String]) {
+        self.totalPanelArea = totalPanelArea
+        self.totalFabricArea = totalFabricArea
+        self.efficiency = efficiency
+        self.requiredFabricLength = requiredFabricLength
+        self.oversizedPanels = oversizedPanels
+        self.isEfficient = isEfficient
+        self.recommendations = recommendations
+    }
+}
+
+/// Validation severity levels
+@available(iOS 18.0, macOS 15.0, *)
+public enum ValidationSeverity: String, Sendable, CaseIterable {
+    case critical = "critical"
+    case error = "error"
+    case warning = "warning"
+    case info = "info"
+}
+
+/// Validation issue types
+@available(iOS 18.0, macOS 15.0, *)
+public enum ValidationIssueType: String, Sendable, CaseIterable {
+    case geometryError = "geometry"
+    case seamAllowanceError = "seam_allowance"
+    case sizeError = "size"
+    case intersectionError = "intersection"
+    case distortionError = "distortion"
+    case grainLineError = "grain_line"
+    case fabricCompatibilityError = "fabric_compatibility"
+}
+
+/// Validation warning types
+@available(iOS 18.0, macOS 15.0, *)
+public enum ValidationWarningType: String, Sendable, CaseIterable {
+    case seamAllowanceWarning = "seam_allowance"
+    case distortionWarning = "distortion"
+    case efficiencyWarning = "efficiency"
+    case optimizationWarning = "optimization"
 }

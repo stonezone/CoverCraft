@@ -1,16 +1,18 @@
 // Version: 1.0.0
 // CoverCraft AR Module - Default AR Scanning Service Implementation
 
+#if !os(macOS) && canImport(ARKit)
 import Foundation
 import ARKit
 import RealityKit
+import AVFoundation
 import simd
 import Logging
 import CoverCraftCore
 import CoverCraftDTO
 
 /// Default implementation of AR scanning service
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public final class DefaultARScanningService: ARScanningService {
     
@@ -112,7 +114,7 @@ public final class DefaultARScanningService: ARScanningService {
         }
     }
     
-    public func isARAvailable() -> Bool {
+    nonisolated public func isARAvailable() -> Bool {
         // Check for LiDAR support
         guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
             return false
@@ -154,11 +156,11 @@ public final class DefaultARScanningService: ARScanningService {
             // Extract triangle indices
             let faces = meshGeometry.faces
             let faceBuffer = faces.buffer.contents()
-            let faceStride = faces.stride
             let faceCount = faces.count
+            let bytesPerIndex = faces.bytesPerIndex
             
             for i in 0..<faceCount {
-                let offset = i * faceStride
+                let offset = i * faces.indexCountPerPrimitive * bytesPerIndex
                 let face = faceBuffer.advanced(by: offset).assumingMemoryBound(to: (UInt32, UInt32, UInt32).self).pointee
                 
                 // Adjust indices by vertex offset
@@ -183,17 +185,78 @@ public final class DefaultARScanningService: ARScanningService {
 
 // MARK: - Service Registration
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension DefaultDependencyContainer {
     
     /// Register AR services
     func registerARServices() {
+        let logger = Logger(label: "com.covercraft.ar.registration")
         logger.info("Registering AR services")
         
         registerSingleton({
-            DefaultARScanningService()
+            // Use unsafeAssumingIsolated to access MainActor context
+            MainActor.assumeIsolated {
+                DefaultARScanningService()
+            }
         }, for: ARScanningService.self)
         
         logger.info("AR services registration completed")
     }
 }
+
+#else
+// MARK: - macOS Stub Implementation
+
+import Foundation
+import Logging
+import CoverCraftCore
+import CoverCraftDTO
+
+/// Stub implementation for macOS where ARKit is not available
+@available(macOS 15.0, *)
+public final class DefaultARScanningService: ARScanningService {
+    
+    private let logger = Logger(label: "com.covercraft.ar.scanning.stub")
+    
+    public init() {
+        logger.info("AR Scanning Service stub initialized (macOS)")
+    }
+    
+    public func startScanning() async throws {
+        logger.warning("AR scanning not available on macOS")
+        throw ARScanningError.deviceNotSupported
+    }
+    
+    public func stopScanning() async {
+        logger.debug("AR scanning stub: stop called")
+    }
+    
+    public func getCurrentMesh() async -> MeshDTO? {
+        logger.debug("AR scanning stub: getCurrentMesh called")
+        return nil
+    }
+    
+    nonisolated public func isARAvailable() -> Bool {
+        return false
+    }
+}
+
+// MARK: - Service Registration (macOS)
+
+@available(macOS 15.0, *)
+public extension DefaultDependencyContainer {
+    
+    /// Register AR services (macOS stub)
+    func registerARServices() {
+        let logger = Logger(label: "com.covercraft.ar.registration.stub")
+        logger.info("Registering AR services (macOS stub)")
+        
+        registerSingleton({
+            DefaultARScanningService()
+        }, for: ARScanningService.self)
+        
+        logger.info("AR services registration completed (macOS stub)")
+    }
+}
+
+#endif

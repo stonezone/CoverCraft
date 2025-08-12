@@ -23,19 +23,20 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-metrics", exact: "2.5.0")
     ],
     targets: [
+        // DTO module - immutable data transfer objects (foundational, no dependencies)
+        .target(
+            name: "CoverCraftDTO",
+            dependencies: []
+        ),
+        
         // Core module - foundational types, protocols, DI container
         .target(
             name: "CoverCraftCore",
             dependencies: [
+                "CoverCraftDTO",  // Added for legacy type aliases
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Metrics", package: "swift-metrics")
             ]
-        ),
-        
-        // DTO module - immutable data transfer objects
-        .target(
-            name: "CoverCraftDTO",
-            dependencies: []
         ),
         
         // AR scanning functionality
@@ -218,6 +219,41 @@ let package = Package(
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
             resources: [.process("Fixtures")]
+        ),
+        
+        // Quality Assurance test targets
+        .testTarget(
+            name: "PerformanceTests",
+            dependencies: [
+                "CoverCraftCore",
+                "CoverCraftDTO",
+                "CoverCraftSegmentation",
+                "CoverCraftFlattening",
+                "CoverCraftExport",
+                "TestUtilities"
+            ]
+        ),
+        .testTarget(
+            name: "ConcurrencyTests",
+            dependencies: [
+                "CoverCraftCore",
+                "CoverCraftDTO",
+                "CoverCraftSegmentation",
+                "CoverCraftFlattening",
+                "CoverCraftExport",
+                "TestUtilities"
+            ]
+        ),
+        .testTarget(
+            name: "MemoryTests",
+            dependencies: [
+                "CoverCraftCore",
+                "CoverCraftDTO",
+                "CoverCraftSegmentation",
+                "CoverCraftFlattening",
+                "CoverCraftExport",
+                "TestUtilities"
+            ]
         )
     ]
 )

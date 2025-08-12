@@ -1,5 +1,8 @@
 import SwiftUI
 
+import SwiftUI
+
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
@@ -152,9 +155,11 @@ public struct HelpView: View {
                 .padding()
             }
             .navigationTitle("Help")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Button("Done") {
                         dismiss()
                     }

@@ -1,5 +1,11 @@
 import SwiftUI
 
+import SwiftUI
+import CoverCraftDTO
+import CoverCraftCore
+import CoverCraftSegmentation
+
+@available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct SegmentationPreview: View {
     let mesh: Mesh?
@@ -68,7 +74,7 @@ public struct SegmentationPreview: View {
                             LazyVGrid(columns: Array(repeating: GridItem(.fixed(30)), count: min(panels.count, 8)), spacing: 4) {
                                 ForEach(Array(panels.prefix(8).enumerated()), id: \.offset) { index, panel in
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color(uiColor: panel.color))
+                                        .fill(Color(red: panel.color.red, green: panel.color.green, blue: panel.color.blue, opacity: panel.color.alpha))
                                         .frame(width: 30, height: 30)
                                 }
                                 
@@ -123,7 +129,7 @@ public struct SegmentationPreview: View {
                         ForEach(Array(panels.enumerated()), id: \.offset) { index, panel in
                             HStack {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(uiColor: panel.color))
+                                    .fill(Color(red: panel.color.red, green: panel.color.green, blue: panel.color.blue, opacity: panel.color.alpha))
                                     .frame(width: 20, height: 20)
                                 
                                 VStack(alignment: .leading) {
@@ -153,7 +159,9 @@ public struct SegmentationPreview: View {
         }
         .padding()
         .navigationTitle("Segmentation")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
     
     private func generatePreview() {
@@ -164,7 +172,7 @@ public struct SegmentationPreview: View {
         
         Task {
             do {
-                let segmenter = MeshSegmentationService()
+                let segmenter = DefaultMeshSegmentationService()
                 let generatedPanels = try await segmenter.segmentMesh(
                     mesh,
                     targetPanelCount: resolution.targetPanelCount

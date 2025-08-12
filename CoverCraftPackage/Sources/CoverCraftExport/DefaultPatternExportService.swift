@@ -16,7 +16,7 @@ import PDFKit
 #endif
 
 /// Default implementation of pattern export service
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public final class DefaultPatternExportService: PatternExportService {
     
     private let logger = Logger(label: "com.covercraft.export")
@@ -61,7 +61,7 @@ public final class DefaultPatternExportService: PatternExportService {
         return [.pdf, .svg, .png, .gif]
     }
     
-    public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult {
+    public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
         var errors: [String] = []
         var warnings: [String] = []
         
@@ -92,7 +92,7 @@ public final class DefaultPatternExportService: PatternExportService {
             break
         }
         
-        return ValidationResult(
+        return ExportValidationResult(
             isValid: errors.isEmpty,
             errors: errors,
             warnings: warnings
@@ -825,7 +825,7 @@ public final class DefaultPatternExportService: PatternExportService {
 
 // MARK: - Service Registration
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension DefaultDependencyContainer {
     
     /// Register export services

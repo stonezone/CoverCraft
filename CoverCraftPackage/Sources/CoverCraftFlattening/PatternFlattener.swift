@@ -1,14 +1,17 @@
 import Foundation
 import simd
 import CoreGraphics
+import CoverCraftDTO
+import CoverCraftCore
 
 /// Service responsible for flattening 3D panels to 2D patterns
-public actor PatternFlattener: PatternFlattenerProtocol {
+@available(iOS 18.0, macOS 15.0, *)
+public actor PatternFlattener: PatternFlatteningService {
     
     public init() {}
     
-    public func flattenPanels(_ panels: [Panel], from mesh: Mesh) async throws -> [FlattenedPanel] {
-        var flattenedPanels: [FlattenedPanel] = []
+    public func flattenPanels(_ panels: [PanelDTO], from mesh: MeshDTO) async throws -> [FlattenedPanelDTO] {
+        var flattenedPanels: [FlattenedPanelDTO] = []
         
         for panel in panels {
             let flattened = try await flattenPanel(panel, mesh: mesh)
@@ -18,7 +21,13 @@ public actor PatternFlattener: PatternFlattenerProtocol {
         return flattenedPanels
     }
     
-    private func flattenPanel(_ panel: Panel, mesh: Mesh) async throws -> FlattenedPanel {
+    public func optimizeForCutting(_ panels: [FlattenedPanelDTO]) async throws -> [FlattenedPanelDTO] {
+        // Basic optimization: return panels as-is
+        // This can be enhanced later with actual cutting optimizations
+        return panels
+    }
+    
+    private func flattenPanel(_ panel: PanelDTO, mesh: MeshDTO) async throws -> FlattenedPanelDTO {
         // Get vertices for this panel
         let panelVertices = Array(panel.vertexIndices).map { mesh.vertices[$0] }
         
@@ -46,35 +55,36 @@ public actor PatternFlattener: PatternFlattenerProtocol {
         // Convert to CGPoint
         let cgPoints = points2D.map { CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)) }
         
-        // Build edge indices
+        // Build edge DTOs
         let vertexIndexMap = Dictionary(uniqueKeysWithValues: 
             panel.vertexIndices.enumerated().map { ($1, $0) })
         
-        var edgeIndices: [(Int, Int)] = []
-        for (v1, v2, _) in edges {
+        var edgeDTOs: [EdgeDTO] = []
+        for (v1, v2, originalLength) in edges {
             if let i1 = vertexIndexMap[v1], let i2 = vertexIndexMap[v2] {
-                edgeIndices.append((i1, i2))
+                edgeDTOs.append(EdgeDTO(
+                    startIndex: i1,
+                    endIndex: i2,
+                    type: .cutLine,
+                    original3DLength: Double(originalLength)
+                ))
             }
         }
         
-        // Calculate bounding box
-        let xs = cgPoints.map { $0.x }
-        let ys = cgPoints.map { $0.y }
-        let minX = xs.min() ?? 0
-        let maxX = xs.max() ?? 0
-        let minY = ys.min() ?? 0
-        let maxY = ys.max() ?? 0
-        let boundingBox = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        // Default color and scale
+        let defaultColor = ColorDTO(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0)
+        let scaleUnitsPerMeter: Double = 1000.0 // Default scale: 1000 units per meter
         
-        return FlattenedPanel(
+        return FlattenedPanelDTO(
             points2D: cgPoints,
-            edges: edgeIndices,
-            sourcePanel: panel,
-            boundingBox: boundingBox
+            edges: edgeDTOs,
+            color: defaultColor,
+            scaleUnitsPerMeter: scaleUnitsPerMeter,
+            originalPanelId: panel.id
         )
     }
     
-    private func findBestProjectionPlane(vertices: [SIMD3<Float>], panel: Panel, mesh: Mesh) -> ProjectionPlane {
+    private func findBestProjectionPlane(vertices: [SIMD3<Float>], panel: PanelDTO, mesh: MeshDTO) -> ProjectionPlane {
         // Compute average normal from panel faces
         var averageNormal = SIMD3<Float>(0, 0, 0)
         var faceCount = 0
@@ -129,10 +139,10 @@ public actor PatternFlattener: PatternFlattenerProtocol {
         }
     }
     
-    private func buildEdgeList(panel: Panel, mesh: Mesh) -> [(Int, Int, Float)] {
+    private func buildEdgeList(panel: PanelDTO, mesh: MeshDTO) -> [(Int, Int, Float)] {
         var edges: Set<EdgeWithLength> = []
         let vertexArray = Array(panel.vertexIndices)
-        let vertexIndexMap = Dictionary(uniqueKeysWithValues: vertexArray.enumerated().map { ($1, $0) })
+        let _ = Dictionary(uniqueKeysWithValues: vertexArray.enumerated().map { ($1, $0) }) // Vertex mapping for future use
         
         // Extract edges from triangles
         for i in stride(from: 0, to: panel.triangleIndices.count, by: 3) {

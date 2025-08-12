@@ -5,7 +5,7 @@ import Foundation
 import Logging
 
 /// Service for collecting application metrics and performance data
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public final class MetricsService: @unchecked Sendable {
     
     public static let shared = MetricsService()
@@ -225,6 +225,7 @@ public final class MetricsService: @unchecked Sendable {
 
 // MARK: - MetricsService Extensions for DI
 
+@available(iOS 18.0, macOS 15.0, *)
 extension MetricsService {
     /// Register metrics services with dependency container
     public static func register(in container: DependencyContainer) {

@@ -8,7 +8,7 @@ import simd
 /// 
 /// This DTO is designed for stable serialization and transfer between modules.
 /// Breaking changes require a version bump and migration path.
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct MeshDTO: Sendable, Codable, Equatable {
     
     // MARK: - Properties
@@ -112,7 +112,7 @@ public struct MeshDTO: Sendable, Codable, Equatable {
 
 // MARK: - Helper Methods
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension MeshDTO {
     
     /// Create a scaled copy of this mesh

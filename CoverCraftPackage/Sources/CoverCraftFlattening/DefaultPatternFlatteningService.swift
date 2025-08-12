@@ -10,10 +10,11 @@ import CoverCraftDTO
 import Accelerate
 
 /// Default implementation of pattern flattening service  
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public final class DefaultPatternFlatteningService: PatternFlatteningService {
     
     private let logger = Logger(label: "com.covercraft.flattening")
+    private let validator = PatternValidator()
     
     public init() {
         logger.info("Pattern Flattening Service initialized")
@@ -35,10 +36,52 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             }
             
             let flattenedPanel = try await flattenSinglePanel(panel, from: mesh)
-            flattenedPanels.append(flattenedPanel)
+            
+            // Validate the flattened panel
+            let validationResult = await validator.validatePanel(flattenedPanel)
+            
+            // Log validation results
+            if !validationResult.issues.isEmpty {
+                logger.warning("Panel \(panel.id) has \(validationResult.issues.count) validation issues")
+                for issue in validationResult.issues {
+                    logger.warning("  - \(issue.severity): \(issue.message)")
+                }
+            }
+            
+            if !validationResult.warnings.isEmpty {
+                logger.info("Panel \(panel.id) has \(validationResult.warnings.count) warnings")
+                for warning in validationResult.warnings {
+                    logger.info("  - \(warning.message)")
+                }
+            }
+            
+            // Only include panels that pass critical validation
+            let criticalIssues = validationResult.issues.filter { $0.severity == .critical }
+            if criticalIssues.isEmpty {
+                flattenedPanels.append(flattenedPanel)
+                logger.info("Panel \(panel.id) passed validation and added to results")
+            } else {
+                logger.error("Panel \(panel.id) failed critical validation and was excluded")
+                for issue in criticalIssues {
+                    logger.error("  - Critical: \(issue.message)")
+                }
+            }
         }
         
-        logger.info("Pattern flattening completed with \(flattenedPanels.count) flattened panels")
+        // Validate the complete panel set
+        if !flattenedPanels.isEmpty {
+            let setValidation = await validator.validatePanelSet(flattenedPanels)
+            logger.info("Panel set validation completed - valid: \(setValidation.isValid ? "PASS" : "FAIL")")
+            
+            if !setValidation.layoutIssues.isEmpty {
+                logger.warning("Panel set has \(setValidation.layoutIssues.count) layout issues")
+                for issue in setValidation.layoutIssues {
+                    logger.warning("  - Set issue: \(issue.message)")
+                }
+            }
+        }
+        
+        logger.info("Pattern flattening completed with \(flattenedPanels.count) validated panels")
         return flattenedPanels
     }
     
@@ -144,7 +187,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     /// Extract mesh data specific to a panel
     private func extractPanelMesh(_ panel: PanelDTO, from mesh: MeshDTO) throws -> PanelMeshData {
         let vertexIndices = Array(panel.vertexIndices).sorted()
-        let vertices = vertexIndices.compactMap { index in
+        let vertices = vertexIndices.compactMap { index -> SIMD3<Float>? in
             guard index < mesh.vertices.count else { return nil }
             return mesh.vertices[index]
         }
@@ -373,7 +416,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             guard crossLength > 1e-8 else { continue } // Avoid degenerate triangles
             
             let cotangent = dot / crossLength
-            cotangentSum += cotangent
+            cotangentSum += Double(cotangent)
         }
         
         return max(cotangentSum * 0.5, 1e-6) // Clamp to avoid numerical issues
@@ -386,14 +429,14 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             throw FlatteningError.flatteningFailed("Empty system")
         }
         
-        // Create sparse matrix structure
-        var rowIndices = system.matrixEntries.map { Int32($0.0) }
-        var colIndices = system.matrixEntries.map { Int32($0.1) }
-        var values = system.matrixEntries.map { $0.2 }
+        // Create sparse matrix structure (for future implementation)
+        let _ = system.matrixEntries.map { Int32($0.0) } // Row indices
+        let _ = system.matrixEntries.map { Int32($0.1) } // Column indices  
+        let _ = system.matrixEntries.map { $0.2 } // Values
         
-        // Solve for U coordinates
-        var solutionU = system.rhsU
-        var info: Int32 = 0
+        // Solve for U coordinates (placeholder for future implementation)
+        let _ = system.rhsU
+        let _ : Int32 = 0 // Info placeholder for sparse solver
         
         // Use iterative solver for better performance with sparse matrices
         let maxIterations: Int32 = 1000
@@ -584,7 +627,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     /// Add seam allowances around boundary
     private func addSeamAllowances(_ points: [CGPoint], boundary: [Int], allowanceWidth: Double) -> [CGPoint] {
         var result = points
-        let boundarySet = Set(boundary)
+        let _ = Set(boundary) // Boundary set for future optimization
         
         // For each boundary vertex, offset outward by allowance width
         for vertex in boundary {
@@ -740,17 +783,19 @@ private struct LSCMSystem {
 
 // MARK: - Service Registration
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension DefaultDependencyContainer {
     
     /// Register flattening services
     func registerFlatteningServices() {
-        logger.info("Registering flattening services")
+        // TODO: Add logging when logger is accessible
+        // logger.info("Registering flattening services")
         
         registerSingleton({
             DefaultPatternFlatteningService()
         }, for: PatternFlatteningService.self)
         
-        logger.info("Flattening services registration completed")
+        // TODO: Add logging when logger is accessible
+        // logger.info("Flattening services registration completed")
     }
 }

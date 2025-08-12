@@ -123,3 +123,27 @@ To include assets in your feature package:
 
 ### Generated with XcodeBuildMCP
 This project was scaffolded using [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP), which provides tools for AI-assisted iOS development workflows.
+
+## Project Documentation
+
+### Available Documentation
+
+1. [CHANGELOG.md](CHANGELOG.md) - Detailed project history and changes
+2. [DEPENDENCIES.md](DEPENDENCIES.md) - Comprehensive dependency management
+3. [API_VERSIONS.md](API_VERSIONS.md) - API versioning and compatibility details
+
+#### DocC Documentation Status
+
+**Note:** Automated DocC documentation generation is currently pending. For comprehensive API documentation, please refer to the source code and provided markdown documentation.
+
+##### Recommended Documentation Review Process
+
+1. Review markdown documentation files
+2. Examine source code comments
+3. Explore package structure in `CoverCraftPackage/Sources/`
+
+###### Future Documentation Improvements
+
+- Implement automated DocC documentation generation
+- Add more detailed inline documentation
+- Create comprehensive API reference guides

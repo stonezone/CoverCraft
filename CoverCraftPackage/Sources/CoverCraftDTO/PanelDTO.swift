@@ -12,7 +12,7 @@ import UIKit
 /// 
 /// This DTO is designed for stable serialization and transfer between modules.
 /// Breaking changes require a version bump and migration path.
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct PanelDTO: Sendable, Codable, Equatable, Identifiable {
     
     // MARK: - Properties
@@ -75,7 +75,7 @@ public struct PanelDTO: Sendable, Codable, Equatable, Identifiable {
 }
 
 /// Color data transfer object for stable serialization
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public struct ColorDTO: Sendable, Codable, Equatable {
     
     // MARK: - Properties
@@ -121,11 +121,11 @@ public struct ColorDTO: Sendable, Codable, Equatable {
 
 // MARK: - SwiftUI Integration
 
-@available(iOS 18.0, *)
+@available(iOS 18.0, macOS 15.0, *)
 public extension ColorDTO {
     
     /// Convert to SwiftUI Color
-    @available(iOS 18.0, macOS 13.0, *)
+    @available(iOS 18.0, macOS 15.0, *)
     var swiftUIColor: Color {
         Color(red: red, green: green, blue: blue, opacity: alpha)
     }
@@ -133,7 +133,7 @@ public extension ColorDTO {
     /// Create ColorDTO from SwiftUI Color
     /// - Parameter color: SwiftUI Color to convert
     /// - Returns: ColorDTO representation
-    @available(iOS 18.0, macOS 13.0, *)
+    @available(iOS 18.0, macOS 15.0, *)
     static func from(swiftUIColor color: Color) -> ColorDTO {
         // Note: This is a simplified conversion
         // In practice, you might need more sophisticated color extraction
