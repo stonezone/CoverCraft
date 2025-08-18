@@ -94,7 +94,7 @@ jobs:
         
     - name: Upload security scan results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-scan-results
         path: CoverCraftPackage/dependencies.json
@@ -119,7 +119,7 @@ jobs:
         
     - name: Upload contract test snapshots
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: contract-snapshots
         path: CoverCraftPackage/Tests/**/__Snapshots__
