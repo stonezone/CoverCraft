@@ -20,7 +20,7 @@ let package = Package(
         // Logging infrastructure
         .package(url: "https://github.com/apple/swift-log", exact: "1.6.1"),
         // Metrics infrastructure  
-        .package(url: "https://github.com/apple/swift-metrics", exact: "2.5.0")
+        .package(url: "https://github.com/apple/swift-metrics", exact: "2.7.1")
     ],
     targets: [
         // DTO module - immutable data transfer objects (foundational, no dependencies)
