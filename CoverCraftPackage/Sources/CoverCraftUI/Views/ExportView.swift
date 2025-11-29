@@ -1,16 +1,19 @@
 import SwiftUI
-import SwiftUI
 import CoverCraftCore
 import CoverCraftDTO
 
 @available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct ExportView: View {
+    @Environment(\.dependencyContainer) private var container
+    
     let flattenedPanels: [FlattenedPanel]?
     
     @State private var selectedFormat = ExportFormat.png
     @State private var isExporting = false
     @State private var exportMessage: String?
+    @State private var isErrorMessage = false
+    @State private var lastExportURL: URL?
     
     public init(flattenedPanels: [FlattenedPanel]?) {
         self.flattenedPanels = flattenedPanels
@@ -119,9 +122,18 @@ public struct ExportView: View {
                 
                 if let message = exportMessage {
                     Text(message)
-                        .foregroundColor(.green)
+                        .foregroundColor(isErrorMessage ? .red : .green)
                         .padding(.horizontal)
                 }
+                
+                #if os(iOS)
+                if let url = lastExportURL {
+                    ShareLink(item: url) {
+                        Text("Share Exported Pattern")
+                    }
+                    .padding(.top, 4)
+                }
+                #endif
                 
                 // Pattern details
                 VStack(alignment: .leading, spacing: 8) {
@@ -166,6 +178,10 @@ public struct ExportView: View {
         #endif
     }
     
+    private var exportService: PatternExportService? {
+        container.resolve(PatternExportService.self)
+    }
+    
     private func formatDescription(for format: ExportFormat) -> String {
         switch format {
         case .png:
@@ -182,8 +198,45 @@ public struct ExportView: View {
     }
     
     private func exportPattern() {
-        guard flattenedPanels != nil else { return }
-        // TODO: Implement export functionality
+        guard let panels = flattenedPanels, !panels.isEmpty else { return }
+        guard let service = exportService else {
+            exportMessage = "Export service not available"
+            isErrorMessage = true
+            return
+        }
+        
+        isExporting = true
+        exportMessage = nil
+        isErrorMessage = false
+        lastExportURL = nil
+        
+        Task {
+            do {
+                let validation = service.validateForExport(panels, format: selectedFormat)
+                guard validation.isValid else {
+                    let message = validation.errors.joined(separator: "; ")
+                    exportMessage = message.isEmpty ? "Export validation failed" : message
+                    isErrorMessage = true
+                    isExporting = false
+                    return
+                }
+                
+                let options = ExportOptions()
+                let result = try await service.exportPatterns(panels, format: selectedFormat, options: options)
+                
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(result.filename)
+                try result.data.write(to: tempURL, options: .atomic)
+                
+                exportMessage = "Exported pattern to \(result.filename)"
+                isErrorMessage = false
+                lastExportURL = tempURL
+                isExporting = false
+            } catch {
+                exportMessage = "Export failed: \(error.localizedDescription)"
+                isErrorMessage = true
+                isExporting = false
+            }
+        }
     }
     
     private var headerView: some View {
