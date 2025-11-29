@@ -169,9 +169,10 @@ public struct ContentView: View {
         
         Task {
             do {
-                // Generate pattern
-                let segmenter = DefaultMeshSegmentationService()
-                let flattener = PatternFlattener()
+                // Generate pattern using injected services
+                let serviceContainer = DefaultDependencyContainer.shared
+                let segmenter = try serviceContainer.requireService(MeshSegmentationService.self)
+                let flattener = try serviceContainer.requireService(PatternFlatteningService.self)
                 
                 let scaledMesh = appState.currentMesh!.scaled(by: appState.calibrationData.scaleFactor)
                 let panels = try await segmenter.segmentMesh(
@@ -190,7 +191,8 @@ public struct ContentView: View {
             } catch {
                 await MainActor.run {
                     isGeneratingPattern = false
-                    // Show error
+                    // TODO: Show error alert to user
+                    print("Pattern generation failed: \(error.localizedDescription)")
                 }
             }
         }

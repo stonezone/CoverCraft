@@ -5,12 +5,7 @@
 	<!-- Base entitlements - add your app's entitlements here -->
 	<!-- AI agents can safely modify this file to add capabilities -->
 	
-	<!-- ARKit and Camera permissions for LiDAR scanning -->
-	<key>com.apple.developer.arkit</key>
-	<true/>
-	
-	<key>com.apple.developer.avfoundation.audio</key>
-	<true/>
+	<!-- ARKit doesn't require special entitlements, just camera permission in Info.plist -->
 	
 	<!-- Example entitlements (commented out by default):
 	

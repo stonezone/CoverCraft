@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		65C728302E5AEF9900EEDEFA /* CoverCraftAR in Frameworks */ = {isa = PBXBuildFile; productRef = 65C7282F2E5AEF9900EEDEFA /* CoverCraftAR */; };
+		65C728322E5AEF9900EEDEFA /* CoverCraftCore in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728312E5AEF9900EEDEFA /* CoverCraftCore */; };
+		65C728342E5AEF9900EEDEFA /* CoverCraftDTO in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728332E5AEF9900EEDEFA /* CoverCraftDTO */; };
+		65C728362E5AEF9900EEDEFA /* CoverCraftExport in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728352E5AEF9900EEDEFA /* CoverCraftExport */; };
+		65C728382E5AEF9900EEDEFA /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728372E5AEF9900EEDEFA /* CoverCraftFeature */; };
 		8B41F6832DEDD23B001A66F9 /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6822DEDD23B001A66F9 /* CoverCraftFeature */; };
 		8B41F6852DEDD25C001A66F9 /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6842DEDD25C001A66F9 /* CoverCraftFeature */; };
 /* End PBXBuildFile section */
@@ -65,7 +70,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				65C728302E5AEF9900EEDEFA /* CoverCraftAR in Frameworks */,
+				65C728362E5AEF9900EEDEFA /* CoverCraftExport in Frameworks */,
+				65C728382E5AEF9900EEDEFA /* CoverCraftFeature in Frameworks */,
 				8B41F6852DEDD25C001A66F9 /* CoverCraftFeature in Frameworks */,
+				65C728322E5AEF9900EEDEFA /* CoverCraftCore in Frameworks */,
+				65C728342E5AEF9900EEDEFA /* CoverCraftDTO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,6 +139,11 @@
 			name = CoverCraft;
 			packageProductDependencies = (
 				8B41F6842DEDD25C001A66F9 /* CoverCraftFeature */,
+				65C7282F2E5AEF9900EEDEFA /* CoverCraftAR */,
+				65C728312E5AEF9900EEDEFA /* CoverCraftCore */,
+				65C728332E5AEF9900EEDEFA /* CoverCraftDTO */,
+				65C728352E5AEF9900EEDEFA /* CoverCraftExport */,
+				65C728372E5AEF9900EEDEFA /* CoverCraftFeature */,
 			);
 			productName = CoverCraft;
 			productReference = 8B41F6452DEDD0D5001A66F9 /* CoverCraft.app */;
@@ -166,10 +181,21 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1630;
-				LastUpgradeCheck = 1630;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					8B41F6442DEDD0D5001A66F9 = {
 						CreatedOnToolsVersion = 16.3;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 0;
+							};
+							com.apple.Push = {
+								enabled = 0;
+							};
+							com.apple.SafariKeychain = {
+								enabled = 0;
+							};
+						};
 					};
 					8B41F65B2DEDD0D6001A66F9 = {
 						CreatedOnToolsVersion = 16.3;
@@ -186,6 +212,9 @@
 			);
 			mainGroup = 8B41F63C2DEDD0D5001A66F9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				65C7282E2E5AEF9900EEDEFA /* XCLocalSwiftPackageReference "CoverCraftPackage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8B41F6462DEDD0D5001A66F9 /* Products */;
 			projectDirPath = "";
@@ -298,6 +327,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -355,6 +385,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;
@@ -368,19 +399,35 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/CoverCraft.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 78725QX6PZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_DISPLAY_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = CoverCraft;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSCameraUsageDescription = "\"CoverCraft needs camera to scan\"";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"ARKit requires location\"";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "portrait landscape-left landscape-right";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.zachjordan.covercraft;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -391,19 +438,35 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/CoverCraft.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 78725QX6PZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_DISPLAY_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = CoverCraft;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSCameraUsageDescription = "\"CoverCraft needs camera to scan\"";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"ARKit requires location\"";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "portrait landscape-left landscape-right";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.zachjordan.covercraft;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -467,7 +530,34 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		65C7282E2E5AEF9900EEDEFA /* XCLocalSwiftPackageReference "CoverCraftPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CoverCraftPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		65C7282F2E5AEF9900EEDEFA /* CoverCraftAR */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoverCraftAR;
+		};
+		65C728312E5AEF9900EEDEFA /* CoverCraftCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoverCraftCore;
+		};
+		65C728332E5AEF9900EEDEFA /* CoverCraftDTO */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoverCraftDTO;
+		};
+		65C728352E5AEF9900EEDEFA /* CoverCraftExport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoverCraftExport;
+		};
+		65C728372E5AEF9900EEDEFA /* CoverCraftFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CoverCraftFeature;
+		};
 		8B41F6822DEDD23B001A66F9 /* CoverCraftFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CoverCraftFeature;

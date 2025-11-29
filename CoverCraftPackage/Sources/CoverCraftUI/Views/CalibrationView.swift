@@ -109,7 +109,7 @@ public struct CalibrationView: View {
             
             // Reset button
             Button("Reset Calibration") {
-                calibrationData.reset()
+                _ = calibrationData.reset()
                 realWorldDistanceText = "1.0"
             }
             .buttonStyle(.bordered)

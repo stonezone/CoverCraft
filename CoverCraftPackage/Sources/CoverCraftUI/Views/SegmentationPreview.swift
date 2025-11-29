@@ -45,7 +45,7 @@ public struct SegmentationPreview: View {
             .cornerRadius(8)
             .padding(.horizontal)
             
-            if let mesh = mesh {
+            if mesh != nil {
                 // Segmentation visualization
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
@@ -165,7 +165,7 @@ public struct SegmentationPreview: View {
     }
     
     private func generatePreview() {
-        guard let mesh = mesh else { return }
+        guard mesh != nil else { return }
         
         isSegmenting = true
         errorMessage = nil
@@ -174,7 +174,7 @@ public struct SegmentationPreview: View {
             do {
                 let segmenter = DefaultMeshSegmentationService()
                 let generatedPanels = try await segmenter.segmentMesh(
-                    mesh,
+                    mesh!,
                     targetPanelCount: resolution.targetPanelCount
                 )
                 

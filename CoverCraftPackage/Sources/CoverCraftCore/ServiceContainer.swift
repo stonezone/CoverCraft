@@ -35,6 +35,7 @@ public enum ServiceContainerError: Error, LocalizedError {
 
 /// Default implementation of dependency injection container - thread-safe with internal locking
 public final class DefaultDependencyContainer: DependencyContainer, @unchecked Sendable {
+    private let lock = NSLock()
     private var services: [String: Any] = [:]
     private var factories: [String: () -> Any] = [:]
     private var resolutionStack: Set<String> = []
@@ -73,6 +74,7 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
     
     /// Resolve a service instance
     public func resolve<T>(_ type: T.Type) -> T? {
+        return lock.withLock {
         let key = String(describing: type)
         
         // Check for circular dependencies
@@ -97,7 +99,8 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
         }
         
         logger.warning("Service not found: \(key)")
-        return nil
+            return nil
+        }
     }
     
     /// Resolve a service instance or throw error

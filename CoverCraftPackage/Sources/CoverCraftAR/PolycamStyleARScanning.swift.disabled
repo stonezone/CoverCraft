@@ -1,0 +1,262 @@
+// PolycamStyleARScanning.swift
+// CoverCraft AR Module - Polycam-Style Real-time LiDAR Scanning
+// Version: 1.0.0
+
+#if canImport(UIKit) && canImport(ARKit)
+import UIKit
+import ARKit
+import Foundation
+import CoverCraftCore
+import CoverCraftDTO
+import Combine
+
+/// Polycam-style AR scanning service with real-time mesh visualization
+/// This implementation processes every frame for smooth, continuous updates
+@available(iOS 18.0, *)
+public final class PolycamStyleARScanning: NSObject, ARScanningService, @unchecked Sendable {
+    
+    // MARK: - Properties
+    
+    private let sessionLock = NSLock()
+    private var arSession: ARSession?
+    private let meshLock = NSLock()
+    private var currentMesh: MeshDTO?
+    private let meshBuilder = IncrementalMeshBuilder()
+    private let scanningLock = NSLock()
+    private var isScanning = false
+    private let frameProcessingQueue = DispatchQueue(label: "com.covercraft.meshprocessing", qos: .userInteractive)
+    
+    // Publisher for real-time mesh updates
+    public let meshUpdatePublisher = PassthroughSubject<MeshDTO, Never>()
+    
+    // MARK: - ARScanningService Protocol
+    
+    public func startScanning() async throws {
+        guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) else {
+            throw NSError(domain: "CoverCraft", code: 1, userInfo: [NSLocalizedDescriptionKey: "This device doesn't support LiDAR scanning"])
+        }
+        
+        await MainActor.run {
+            // Configure AR session for Polycam-style capture
+            let configuration = ARWorldTrackingConfiguration()
+            configuration.sceneReconstruction = .meshWithClassification
+            configuration.frameSemantics = .sceneDepth  // Direct LiDAR access
+            configuration.environmentTexturing = .automatic
+            configuration.planeDetection = []  // Disable plane detection for performance
+            
+            // Create and start session
+            let session = ARSession()
+            session.delegate = self
+            session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+            
+            self.sessionLock.lock()
+            self.arSession = session
+            self.sessionLock.unlock()
+            
+            self.scanningLock.lock()
+            self.isScanning = true
+            self.scanningLock.unlock()
+            
+            print("POLYCAM: Started real-time LiDAR scanning")
+        }
+    }
+    
+    public func stopScanning() async {
+        await MainActor.run {
+            sessionLock.lock()
+            arSession?.pause()
+            sessionLock.unlock()
+            
+            scanningLock.lock()
+            isScanning = false
+            scanningLock.unlock()
+            
+            // Build final mesh from all chunks
+            if let finalMesh = buildFinalMesh() {
+                meshLock.lock()
+                currentMesh = finalMesh
+                meshLock.unlock()
+                meshUpdatePublisher.send(finalMesh)
+            }
+            
+            meshLock.lock()
+            let vertexCount = currentMesh?.vertices.count ?? 0
+            meshLock.unlock()
+            print("POLYCAM: Stopped scanning, final mesh: \(vertexCount) vertices")
+        }
+    }
+    
+    public func getCurrentMesh() async -> MeshDTO? {
+        meshLock.lock()
+        defer { meshLock.unlock() }
+        return currentMesh
+    }
+    
+    public func isARAvailable() -> Bool {
+        return ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+    }
+    
+    // MARK: - Private Methods
+    
+    private func buildFinalMesh() -> MeshDTO? {
+        let combinedData = meshBuilder.getCombinedMesh()
+        
+        guard !combinedData.vertices.isEmpty else { return nil }
+        
+        return MeshDTO(
+            vertices: combinedData.vertices,
+            triangleIndices: combinedData.indices.map { Int($0) },
+            id: UUID(),
+            createdAt: Date()
+        )
+    }
+    
+    // MARK: - Incremental Mesh Builder
+    
+    private class IncrementalMeshBuilder {
+        private var meshChunks: [UUID: MeshChunk] = [:]
+        private let chunkLock = NSLock()
+        
+        struct MeshChunk {
+            let transform: simd_float4x4
+            let vertices: [SIMD3<Float>]
+            let indices: [UInt32]
+            let classification: ARMeshClassification
+            let timestamp: Date
+        }
+        
+        func updateChunk(for anchor: ARMeshAnchor) {
+            let geometry = anchor.geometry
+            guard geometry.vertices.count > 0 else { return }
+            
+            // Extract vertices efficiently
+            var vertices: [SIMD3<Float>] = []
+            let vertexCount = geometry.vertices.count
+            let vertexStride = geometry.vertices.stride
+            
+            geometry.vertices.buffer.contents().withMemoryRebound(to: Float.self, capacity: vertexCount * 3) { ptr in
+                for i in 0..<vertexCount {
+                    let offset = i * (vertexStride / MemoryLayout<Float>.size)
+                    vertices.append(SIMD3<Float>(
+                        ptr[offset],
+                        ptr[offset + 1],
+                        ptr[offset + 2]
+                    ))
+                }
+            }
+            
+            // Extract indices
+            var indices: [UInt32] = []
+            let indexCount = geometry.faces.count * 3
+            
+            if geometry.faces.bytesPerIndex == 2 {
+                geometry.faces.buffer.contents().withMemoryRebound(to: UInt16.self, capacity: indexCount) { ptr in
+                    for i in 0..<indexCount {
+                        indices.append(UInt32(ptr[i]))
+                    }
+                }
+            } else {
+                geometry.faces.buffer.contents().withMemoryRebound(to: UInt32.self, capacity: indexCount) { ptr in
+                    for i in 0..<indexCount {
+                        indices.append(ptr[i])
+                    }
+                }
+            }
+            
+            // Store chunk with classification
+            chunkLock.lock()
+            meshChunks[anchor.identifier] = MeshChunk(
+                transform: anchor.transform,
+                vertices: vertices,
+                indices: indices,
+                classification: anchor.classification ?? .none,
+                timestamp: Date()
+            )
+            chunkLock.unlock()
+            
+            // Prune old chunks if too many
+            if meshChunks.count > 200 {
+                pruneOldChunks()
+            }
+        }
+        
+        func getCombinedMesh() -> (vertices: [SIMD3<Float>], indices: [Int32]) {
+            chunkLock.lock()
+            defer { chunkLock.unlock() }
+            
+            var allVertices: [SIMD3<Float>] = []
+            var allIndices: [Int32] = []
+            var vertexOffset: Int32 = 0
+            
+            for chunk in meshChunks.values {
+                // Transform vertices to world space
+                for localVertex in chunk.vertices {
+                    let worldPos = chunk.transform * SIMD4<Float>(localVertex, 1.0)
+                    allVertices.append(SIMD3<Float>(worldPos.x, worldPos.y, worldPos.z))
+                }
+                
+                // Adjust indices
+                for index in chunk.indices {
+                    allIndices.append(Int32(index) + vertexOffset)
+                }
+                
+                vertexOffset += Int32(chunk.vertices.count)
+            }
+            
+            return (allVertices, allIndices)
+        }
+        
+        private func pruneOldChunks() {
+            let cutoffDate = Date().addingTimeInterval(-10.0)  // Keep last 10 seconds
+            meshChunks = meshChunks.filter { $0.value.timestamp > cutoffDate }
+        }
+        
+        func reset() {
+            chunkLock.lock()
+            meshChunks.removeAll()
+            chunkLock.unlock()
+        }
+    }
+}
+
+// MARK: - ARSessionDelegate
+
+extension PolycamStyleARScanning: ARSessionDelegate {
+    
+    nonisolated public func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // POLYCAM-STYLE: Process EVERY frame for smooth updates
+        scanningLock.lock()
+        let scanning = isScanning
+        scanningLock.unlock()
+        
+        guard scanning else { return }
+        
+        let meshAnchors = frame.anchors.compactMap { $0 as? ARMeshAnchor }
+        
+        // Process on background queue for performance
+        frameProcessingQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Update chunks incrementally
+            for anchor in meshAnchors {
+                self.meshBuilder.updateChunk(for: anchor)
+            }
+            
+            // Emit update every few frames to avoid overwhelming the UI
+            if frame.timestamp.truncatingRemainder(dividingBy: 0.1) < 0.016 {  // ~10 Hz updates
+                if let mesh = self.buildFinalMesh() {
+                    self.meshLock.lock()
+                    self.currentMesh = mesh
+                    self.meshLock.unlock()
+                    self.meshUpdatePublisher.send(mesh)
+                }
+            }
+        }
+    }
+    
+    nonisolated public func session(_ session: ARSession, didFailWithError error: Error) {
+        print("POLYCAM: AR session failed: \(error.localizedDescription)")
+    }
+}
+
+#endif

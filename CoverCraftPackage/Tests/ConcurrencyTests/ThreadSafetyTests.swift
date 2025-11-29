@@ -7,6 +7,7 @@ import CoverCraftDTO
 @testable import CoverCraftFlattening
 @testable import CoverCraftExport
 
+
 @Suite("Thread Safety and Concurrency Tests")
 struct ThreadSafetyTests {
     
@@ -14,26 +15,35 @@ struct ThreadSafetyTests {
     
     @Test("Service container actor isolation")
     func testServiceContainerActorIsolation() async throws {
-        let container = ServiceContainer()
+        let container = DefaultDependencyContainer()
+        
+        // Register services for testing
+        container.registerSingleton({ DefaultMeshSegmentationService() }, for: MeshSegmentationService.self)
+        container.registerSingleton({ DefaultPatternFlatteningService() }, for: PatternFlatteningService.self)
+        container.registerSingleton({ DefaultPatternExportService() }, for: PatternExportService.self)
         
         // Test concurrent access to services
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<100 {
                 group.addTask {
                     // Each task tries to access services
-                    let _ = await container.meshSegmentationService
-                    let _ = await container.patternFlattener
-                    let _ = await container.patternExporter
+                    let _: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
+                    let _: PatternFlatteningService? = container.resolve(PatternFlatteningService.self)
+                    let _: PatternExportService? = container.resolve(PatternExportService.self)
                 }
             }
         }
         
         // Verify services are properly isolated
-        let service1 = await container.meshSegmentationService
-        let service2 = await container.meshSegmentationService
+        let service1: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
+        let service2: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
         
         // Services should be the same instance (singleton pattern)
-        #expect(ObjectIdentifier(service1) == ObjectIdentifier(service2))
+        #expect(service1 != nil)
+        #expect(service2 != nil)
+        if let s1 = service1, let s2 = service2 {
+            #expect(ObjectIdentifier(s1 as AnyObject) == ObjectIdentifier(s2 as AnyObject))
+        }
     }
     
     @Test("Segmentation service thread safety")
@@ -77,7 +87,7 @@ struct ThreadSafetyTests {
     
     @Test("Pattern flattener thread safety")
     func testPatternFlattenerThreadSafety() async throws {
-        let flattener = DefaultPatternFlattener()
+        let flattener = DefaultPatternFlatteningService()
         let segmenter = DefaultMeshSegmentationService()
         let mesh = TestDataFactory.createCubeMesh()
         let panels = try await segmenter.segmentMesh(mesh, targetPanelCount: 6)
@@ -87,7 +97,7 @@ struct ThreadSafetyTests {
             for panel in panels {
                 group.addTask {
                     do {
-                        let flattened = try await flattener.flattenPanel(panel, from: mesh)
+                        let flattened = try await flattener.flattenPanels([panel], from: mesh).first!
                         return .success(flattened)
                     } catch {
                         return .failure(error)
@@ -107,7 +117,7 @@ struct ThreadSafetyTests {
         for result in results {
             switch result {
             case .success(let flattened):
-                #expect(!flattened.vertices2D.isEmpty)
+                #expect(!flattened.points2D.isEmpty)
                 successCount += 1
             case .failure(let error):
                 #expect(Bool(false), "Flattening thread safety violation: \(error)")
@@ -211,18 +221,16 @@ struct ThreadSafetyTests {
     @Test("Verify Sendable conformance for DTOs")
     func testSendableConformance() async throws {
         // Test that our DTOs can safely cross concurrency boundaries
-        let mesh = MeshData(
+        let mesh = MeshDTO(
             vertices: [SIMD3<Float>(0, 0, 0), SIMD3<Float>(1, 0, 0), SIMD3<Float>(0, 1, 0)],
-            triangles: [SIMD3<Int32>(0, 1, 2)],
-            normals: [SIMD3<Float>(0, 0, 1), SIMD3<Float>(0, 0, 1), SIMD3<Float>(0, 0, 1)]
+            triangleIndices: [0, 1, 2]
+
         )
         
-        let panel = Panel(
-            id: UUID(),
-            vertexIndices: [0, 1, 2],
+        let panel = PanelDTO(
+            vertexIndices: Set([0, 1, 2]),
             triangleIndices: [0],
-            normal: SIMD3<Float>(0, 0, 1),
-            area: 0.5
+            color: ColorDTO.red
         )
         
         // These should compile without warnings under strict concurrency
@@ -274,7 +282,7 @@ struct ThreadSafetyTests {
     @Test("Memory consistency under concurrent load")
     func testMemoryConsistency() async throws {
         let segmenter = DefaultMeshSegmentationService()
-        let flattener = DefaultPatternFlattener()
+        let flattener = DefaultPatternFlatteningService()
         
         // Track memory allocations
         actor MemoryTracker {
@@ -301,7 +309,7 @@ struct ThreadSafetyTests {
                         let panels = try await segmenter.segmentMesh(mesh, targetPanelCount: 4)
                         
                         for panel in panels {
-                            let flattened = try await flattener.flattenPanel(panel, from: mesh)
+                            let flattened = try await flattener.flattenPanels([panel], from: mesh).first!
                             // Track the allocation
                             await tracker.track(flattened as AnyObject)
                         }
@@ -321,29 +329,34 @@ struct ThreadSafetyTests {
     
     @Test("Deadlock prevention in service calls", .timeLimit(.minutes(1)))
     func testDeadlockPrevention() async throws {
-        let container = ServiceContainer()
+        let container = DefaultDependencyContainer()
+        
+        // Register services for testing
+        container.registerSingleton({ DefaultMeshSegmentationService() }, for: MeshSegmentationService.self)
+        container.registerSingleton({ DefaultPatternFlatteningService() }, for: PatternFlatteningService.self)
+        container.registerSingleton({ DefaultPatternExportService() }, for: PatternExportService.self)
         
         // Create potential deadlock scenario with circular dependencies
         await withTaskGroup(of: Void.self) { group in
             // Task 1: Access services in order A -> B -> C
             group.addTask {
-                let _ = await container.meshSegmentationService
-                let _ = await container.patternFlattener
-                let _ = await container.patternExporter
+                let _: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
+                let _: PatternFlatteningService? = container.resolve(PatternFlatteningService.self)
+                let _: PatternExportService? = container.resolve(PatternExportService.self)
             }
             
             // Task 2: Access services in order C -> B -> A
             group.addTask {
-                let _ = await container.patternExporter
-                let _ = await container.patternFlattener
-                let _ = await container.meshSegmentationService
+                let _: PatternExportService? = container.resolve(PatternExportService.self)
+                let _: PatternFlatteningService? = container.resolve(PatternFlatteningService.self)
+                let _: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
             }
             
             // Task 3: Rapid alternating access
             group.addTask {
                 for _ in 0..<10 {
-                    let _ = await container.meshSegmentationService
-                    let _ = await container.patternExporter
+                    let _: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
+                    let _: PatternExportService? = container.resolve(PatternExportService.self)
                 }
             }
         }
@@ -354,7 +367,55 @@ struct ThreadSafetyTests {
     }
 }
 
-// MARK: - Test Helper
+// MARK: - Test Helpers
+
+struct TestDataFactory {
+    /// Create a simple cube mesh for testing
+    static func createCubeMesh() -> MeshDTO {
+        let vertices: [SIMD3<Float>] = [
+            // Front face
+            SIMD3<Float>(-0.5, -0.5,  0.5),  // 0
+            SIMD3<Float>( 0.5, -0.5,  0.5),  // 1
+            SIMD3<Float>( 0.5,  0.5,  0.5),  // 2
+            SIMD3<Float>(-0.5,  0.5,  0.5),  // 3
+            // Back face
+            SIMD3<Float>(-0.5, -0.5, -0.5),  // 4
+            SIMD3<Float>( 0.5, -0.5, -0.5),  // 5
+            SIMD3<Float>( 0.5,  0.5, -0.5),  // 6
+            SIMD3<Float>(-0.5,  0.5, -0.5),  // 7
+        ]
+        
+        let triangleIndices: [Int] = [
+            // Front face
+            0, 1, 2,  2, 3, 0,
+            // Back face
+            4, 6, 5,  6, 4, 7,
+            // Left face
+            4, 0, 3,  3, 7, 4,
+            // Right face
+            1, 5, 6,  6, 2, 1,
+            // Top face
+            3, 2, 6,  6, 7, 3,
+            // Bottom face
+            4, 5, 1,  1, 0, 4
+        ]
+        
+        return MeshDTO(vertices: vertices, triangleIndices: triangleIndices)
+    }
+    
+    /// Create a simple triangle mesh for testing
+    static func createTriangleMesh() -> MeshDTO {
+        let vertices: [SIMD3<Float>] = [
+            SIMD3<Float>(0.0, 1.0, 0.0),
+            SIMD3<Float>(-1.0, -1.0, 0.0),
+            SIMD3<Float>(1.0, -1.0, 0.0)
+        ]
+        
+        let triangleIndices: [Int] = [0, 1, 2]
+        
+        return MeshDTO(vertices: vertices, triangleIndices: triangleIndices)
+    }
+}
 
 struct LargeMeshFactory {
     static func createLargeMesh(triangleCount: Int) -> MeshDTO {

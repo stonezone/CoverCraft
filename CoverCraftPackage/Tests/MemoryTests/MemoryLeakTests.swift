@@ -7,12 +7,12 @@ import CoverCraftFlattening
 import CoverCraftExport
 import CoverCraftAR
 
-import Darwin
+@preconcurrency import Darwin
 
 @Suite("Memory Leak Detection Tests")
-@available(iOS 18.0, macOS 15.0, *)
 struct MemoryLeakTests {
     
+    @available(iOS 18.0, macOS 15.0, *)
     @Test("Memory usage does not grow during repeated segmentation")
     func testSegmentationMemoryLeaks() async throws {
         let tracker = MemoryTracker()
@@ -43,6 +43,7 @@ struct MemoryLeakTests {
         tracker.printSummary()
     }
     
+    @available(iOS 18.0, macOS 15.0, *)
     @Test("Flattening service releases memory properly")
     func testFlatteningMemoryLeaks() async throws {
         let tracker = MemoryTracker()
@@ -78,6 +79,7 @@ struct MemoryLeakTests {
         tracker.printSummary()
     }
     
+    @available(iOS 18.0, macOS 15.0, *)
     @Test("Large mesh processing doesn't cause excessive memory allocation")
     func testLargeMeshMemoryUsage() async throws {
         let tracker = MemoryTracker()
@@ -106,6 +108,7 @@ struct MemoryLeakTests {
         tracker.printSummary()
     }
     
+    @available(iOS 18.0, macOS 15.0, *)
     @Test("Service containers don't leak when recreated")
     func testServiceContainerMemoryLeaks() async throws {
         let tracker = MemoryTracker()
@@ -117,7 +120,7 @@ struct MemoryLeakTests {
             container.registerSegmentationServices()
             container.registerFlatteningServices()
             
-            let segmenter: MeshSegmentationService = try container.resolve()
+            let segmenter = try container.requireService(MeshSegmentationService.self)
             let mesh = LargeMeshFactory.createLargeMesh(triangleCount: 1000)
             let _ = try await segmenter.segmentMesh(mesh, targetPanelCount: 3)
             
@@ -139,6 +142,7 @@ struct MemoryLeakTests {
         tracker.printSummary()
     }
     
+    @available(iOS 18.0, macOS 15.0, *)
     @Test("Mesh data structures are efficiently stored")
     func testMeshDataEfficiency() throws {
         let mesh1k = LargeMeshFactory.createLargeMesh(triangleCount: 1_000)
@@ -178,13 +182,15 @@ class MemoryTracker {
         checkpoints.append(Checkpoint(name: name, memory: memory, timestamp: Date()))
     }
     
-    private func getMemoryUsage() -> Int64 {
+    private nonisolated func getMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
         
+        // Capture task self synchronously to avoid concurrency issues
+        let task = mach_task_self_
         let result = withUnsafeMutablePointer(to: &info) { pointer in
             pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { pointer in
-                task_info(mach_task_self_,
+                task_info(task,
                          task_flavor_t(MACH_TASK_BASIC_INFO),
                          pointer,
                          &count)

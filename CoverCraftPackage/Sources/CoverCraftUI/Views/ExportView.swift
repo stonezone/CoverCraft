@@ -182,7 +182,7 @@ public struct ExportView: View {
     }
     
     private func exportPattern() {
-        guard let panels = flattenedPanels else { return }
+        guard flattenedPanels != nil else { return }
         // TODO: Implement export functionality
     }
     

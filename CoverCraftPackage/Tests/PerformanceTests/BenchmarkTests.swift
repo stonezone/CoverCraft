@@ -6,10 +6,9 @@ import CoverCraftSegmentation
 import CoverCraftFlattening
 import CoverCraftExport
 
-import Darwin
+@preconcurrency import Darwin
 
 @Suite("Performance Benchmark Tests")
-@available(iOS 18.0, macOS 15.0, *)
 struct BenchmarkTests {
     
     // MARK: - Test Data Factory
@@ -270,7 +269,7 @@ struct BenchmarkTests {
     
     // MARK: - Utility Functions
     
-    private func getMemoryUsage() -> Int64 {
+    private nonisolated func getMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
         

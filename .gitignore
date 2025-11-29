@@ -1,15 +1,13 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONSOLIDATED .gitignore - iOS/macOS/Swift Projects
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Xcode
-#
-# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
-
-## User settings
+# ─────────────────────────────────────────────────────────────────────────────
 xcuserdata/
-
-## Compatibility with Xcode 8 and earlier (ignoring not required starting Xcode 9)
 *.xcscmblueprint
 *.xccheckout
-
-## Compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
 build/
 DerivedData/
 *.moved-aside
@@ -21,87 +19,54 @@ DerivedData/
 !default.mode2v3
 *.perspectivev3
 !default.perspectivev3
-
-## Obj-C/Swift specific
 *.hmap
-
-## App packaging
 *.ipa
 *.dSYM.zip
 *.dSYM
-
-## Playgrounds
+*.xcresult
+*.trace
 timeline.xctimeline
 playground.xcworkspace
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Swift Package Manager
-#
-# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+# ─────────────────────────────────────────────────────────────────────────────
 Packages/
 Package.pins
 Package.resolved
-# Note: We keep Package.swift as it's essential for the project
-
-# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
-# hence it is not needed unless you have added a package configuration file to your project
 .swiftpm/
-
 .build/
 .index-build/
 
-# CocoaPods
-#
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
+# ─────────────────────────────────────────────────────────────────────────────
+# Dependency Managers
+# ─────────────────────────────────────────────────────────────────────────────
+# CocoaPods (uncomment if not checking in Pods/)
 # Pods/
-#
-# Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
 
 # Carthage
-#
-# Add this line if you want to avoid checking in source code from Carthage dependencies.
-# Carthage/Checkouts
-
 Carthage/Build/
 
-# Accio dependency management
+# Accio
 Dependencies/
 .accio/
 
+# ─────────────────────────────────────────────────────────────────────────────
 # fastlane
-#
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
-
+# ─────────────────────────────────────────────────────────────────────────────
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
-# Code Injection
-#
-# After new code Injection tools there's a generated folder /iOSInjectionProject
-# https://github.com/johnno1962/injectionforxcode
-
-iOSInjectionProject/
-
-# macOS
+# ─────────────────────────────────────────────────────────────────────────────
+# macOS System Files
+# ─────────────────────────────────────────────────────────────────────────────
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Icon must end with two \r
 Icon
-
-# Thumbnails
 ._*
-
-# Files that might appear in the root of a volume
 .DocumentRevisions-V100
 .fseventsd
 .Spotlight-V100
@@ -109,145 +74,218 @@ Icon
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
-
-# Directories potentially created on remote AFP share
 .AppleDB
 .AppleDesktop
 Network Trash Folder
 Temporary Items
 .apdisk
 
-# IDEs
+# ─────────────────────────────────────────────────────────────────────────────
+# IDEs & Editors
+# ─────────────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.#*
+\#*#
 
-# Development Tools
+# AI Assistants
+.cursor/
+.serena/
+.claude/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment & Secrets
+# ─────────────────────────────────────────────────────────────────────────────
 .env.local
 .env.development
 .env.test
 .env.production
+secrets.json
+*.pem
+*.p12
+*.mobileprovision
+*.certSigningRequest
+AuthKey_*.p8
+GoogleService-Info.plist
+google-services.json
+local.properties
+settings.local.json
 
-# Build and Test Reports
+# ─────────────────────────────────────────────────────────────────────────────
+# Build, Test & Coverage Reports
+# ─────────────────────────────────────────────────────────────────────────────
 build-logs/
 test-reports/
 coverage/
+htmlcov/
 *.coverage
+.coverage
+.coverage.*
 *.profraw
 *.profdata
-
-# Dependency Check Reports
 dependency-check-reports/
 dependency-reports/
 
-# Temporary backups
-.dependency-backups/
-*.backup
-*.bak
+# ─────────────────────────────────────────────────────────────────────────────
+# Generated Reports & Artifacts
+# ─────────────────────────────────────────────────────────────────────────────
+swiftlint_report.json
+*_report.json
+*_REPORT.md
+*_COMPLETION_REPORT.md
+QUALITY_METRICS_REPORT.md
 
-# Log files
+# ─────────────────────────────────────────────────────────────────────────────
+# Test Binaries & Executables
+# ─────────────────────────────────────────────────────────────────────────────
+test_*
+!test_*/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Logs & Temporary Files
+# ─────────────────────────────────────────────────────────────────────────────
 *.log
 logs/
-
-# Temporary files
 tmp/
 temp/
 .tmp/
 
-# Archives
+# ─────────────────────────────────────────────────────────────────────────────
+# Archives & Backups
+# ─────────────────────────────────────────────────────────────────────────────
 *.zip
 *.tar
 *.tar.gz
 *.rar
 *.7z
+*.backup
+*.bak
+.dependency-backups/
+archive*/
+Archive*/
+*_archive/
+backup*/
+Backup*/
 
-# Test artifacts
-*.xcresult
+# ─────────────────────────────────────────────────────────────────────────────
+# Legacy & Planning Documents
+# ─────────────────────────────────────────────────────────────────────────────
+project summary.txt
+HANDOFF_*.md
+REWRITE.md
 
-# SwiftLint cache
-.swiftlint-cache/
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Instruction Files (project-specific prompts)
+# ─────────────────────────────────────────────────────────────────────────────
+*-prompt.md
+*-instructions.md
 
-# Instruments
-*.trace
-
-# Core Data
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-
-# App Store Connect API Key
-AuthKey_*.p8
-
-# Generated files
-Generated/
-*-Generated.swift
-
-# Documentation builds
-docs/_site/
-docs/.jekyll-cache/
-
-# Node modules (if using any web-based tooling)
-node_modules/
-
-# Python (if using any Python tooling)
+# ─────────────────────────────────────────────────────────────────────────────
+# Python (tooling support)
+# ─────────────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
 env/
 venv/
 ENV/
+.venv/
 env.bak/
 venv.bak/
 
-# Ruby (if using fastlane or other Ruby tools)
+# ─────────────────────────────────────────────────────────────────────────────
+# Ruby (fastlane/tooling support)
+# ─────────────────────────────────────────────────────────────────────────────
 *.gem
 *.rbc
 /.config
-/coverage/
 /InstalledFiles
 /pkg/
 /spec/reports/
 /spec/examples.txt
 /test/tmp/
 /test/version_tmp/
-/tmp/
 .bundle/
 vendor/bundle
 lib/bundler/man/
 
-# Secrets and credentials
-secrets.json
-*.pem
-*.p12
-*.mobileprovision
-*.certSigningRequest
+# ─────────────────────────────────────────────────────────────────────────────
+# Node.js (web tooling support)
+# ─────────────────────────────────────────────────────────────────────────────
+node_modules/
 
-# Firebase
-GoogleService-Info.plist
-google-services.json
+# ─────────────────────────────────────────────────────────────────────────────
+# Code Injection
+# ─────────────────────────────────────────────────────────────────────────────
+iOSInjectionProject/
 
-# Local development overrides
-local.properties
-settings.local.json
+# ─────────────────────────────────────────────────────────────────────────────
+# SwiftLint
+# ─────────────────────────────────────────────────────────────────────────────
+.swiftlint-cache/
 
-# Editor backups
-*~
-.#*
-#*#
+# ─────────────────────────────────────────────────────────────────────────────
+# Core Data
+# ─────────────────────────────────────────────────────────────────────────────
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
-# CoverCraft specific
-# Exclude large image files that aren't needed in repo
+# ─────────────────────────────────────────────────────────────────────────────
+# Generated Files
+# ─────────────────────────────────────────────────────────────────────────────
+Generated/
+*-Generated.swift
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Documentation Builds
+# ─────────────────────────────────────────────────────────────────────────────
+docs/_site/
+docs/.jekyll-cache/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project-Specific
+# ─────────────────────────────────────────────────────────────────────────────
+# Jetson runtime
+jetson/fixes.jsonl
+jetson/*.log
+
+# Large assets not needed in repo
 icon.png
 icon2.jpg
 
-# Serena IDE workspace files (local AI assistant)
-.serena/
+# ─────────────────────────────────────────────────────────────────────────────
+# Markdown Files (selective tracking)
+# ─────────────────────────────────────────────────────────────────────────────
+*.md
 
-# Project planning documents (keep in repo for reference)
-# covercraft-migration-instructions.txt
-# covercraft-prompt.md  
-# project summary.txt
+# Exceptions - keep these tracked
+!README.md
+!CONTRIBUTING.md
+!CHANGELOG.md
+!CODE_OF_CONDUCT.md
+!SECURITY.md
+!SUPPORT.md
+!LICENSE.md
+!RELEASE_NOTES.md
+!ROADMAP.md
+!CLAUDE.md
+!ARCHITECTURE.md
+!API_VERSIONS.md
+!API_VERSIONING.md
+!DEPENDENCIES.md
+!docs/*.md
+!docs/**/*.md
+!src/README.md
+!/.github/ISSUE_TEMPLATE/*.md
+!/.github/PULL_REQUEST_TEMPLATE.md
+!/.github/CONTRIBUTING.md
+!/.github/SECURITY.md
+!/.github/SUPPORT.md
