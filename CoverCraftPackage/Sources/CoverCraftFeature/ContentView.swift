@@ -12,6 +12,22 @@ import CoverCraftUI
 public struct ContentView: View {
     // MARK: - State
     
+    @Environment(\.dependencyContainer) private var container
+    
+    // MARK: - Dependencies
+    
+    private var arService: ARScanningService? {
+        container.resolve(ARScanningService.self)
+    }
+    
+    private var segmentationService: MeshSegmentationService? {
+        container.resolve(MeshSegmentationService.self)
+    }
+    
+    private var flatteningService: PatternFlatteningService? {
+        container.resolve(PatternFlatteningService.self)
+    }
+    
     @State private var appState = AppState()
     @State private var showingScanner = false
     @State private var showingHelp = false
@@ -165,16 +181,20 @@ public struct ContentView: View {
     private func generatePattern() {
         guard appState.canGeneratePattern else { return }
         
+        guard
+            let segmenter = segmentationService,
+            let flattener = flatteningService,
+            let currentMesh = appState.currentMesh
+        else {
+            print("CRITICAL: Required services not registered in dependency container")
+            return
+        }
+        
         isGeneratingPattern = true
         
         Task {
             do {
-                // Generate pattern using injected services
-                let serviceContainer = DefaultDependencyContainer.shared
-                let segmenter = try serviceContainer.requireService(MeshSegmentationService.self)
-                let flattener = try serviceContainer.requireService(PatternFlatteningService.self)
-                
-                let scaledMesh = appState.currentMesh!.scaled(by: appState.calibrationData.scaleFactor)
+                let scaledMesh = currentMesh.scaled(by: appState.calibrationData.scaleFactor)
                 let panels = try await segmenter.segmentMesh(
                     scaledMesh,
                     targetPanelCount: appState.selectedResolution.targetPanelCount
@@ -198,5 +218,4 @@ public struct ContentView: View {
         }
     }
 }
-
 

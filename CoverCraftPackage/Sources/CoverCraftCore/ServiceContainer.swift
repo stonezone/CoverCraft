@@ -49,25 +49,31 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
     /// Register a service instance
     public func register<T>(_ service: T, for type: T.Type) {
         let key = String(describing: type)
-        services[key] = service
+        lock.withLock {
+            services[key] = service
+        }
         logger.info("Registered service: \(key)")
     }
     
     /// Register a service factory for lazy instantiation
     public func registerFactory<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type) {
         let key = String(describing: type)
-        factories[key] = factory
+        lock.withLock {
+            factories[key] = factory
+        }
         logger.info("Registered factory: \(key)")
     }
     
     /// Register a singleton factory
     public func registerSingleton<T>(_ factory: @escaping @Sendable () -> T, for type: T.Type) {
         let key = String(describing: type)
-        factories[key] = {
-            let instance = factory()
-            self.services[key] = instance
-            self.logger.info("Created singleton: \(key)")
-            return instance
+        lock.withLock {
+            factories[key] = {
+                let instance = factory()
+                self.services[key] = instance
+                self.logger.info("Created singleton: \(key)")
+                return instance
+            }
         }
         logger.info("Registered singleton factory: \(key)")
     }
@@ -114,23 +120,30 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
     /// Remove a service registration
     public func unregister<T>(_ type: T.Type) {
         let key = String(describing: type)
-        services.removeValue(forKey: key)
-        factories.removeValue(forKey: key)
+        lock.withLock {
+            services.removeValue(forKey: key)
+            factories.removeValue(forKey: key)
+        }
         logger.info("Unregistered service: \(key)")
     }
     
     /// Clear all registered services
     public func clear() {
-        let count = services.count + factories.count
-        services.removeAll()
-        factories.removeAll()
+        let count: Int = lock.withLock {
+            let total = services.count + factories.count
+            services.removeAll()
+            factories.removeAll()
+            return total
+        }
         logger.info("Cleared \(count) service registrations")
     }
     
     /// Check if a service is registered
     public func isRegistered<T>(_ type: T.Type) -> Bool {
         let key = String(describing: type)
-        return services[key] != nil || factories[key] != nil
+        return lock.withLock {
+            services[key] != nil || factories[key] != nil
+        }
     }
 }
 

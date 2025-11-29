@@ -161,16 +161,8 @@ public final class DefaultPatternExportService: PatternExportService {
     
     private func generatePNG(panels: [FlattenedPanelDTO], options: ExportOptions) async throws -> Data {
         #if canImport(UIKit)
-        return try await withCheckedThrowingContinuation { continuation in
-            Task { @MainActor in
-                do {
-                    let pngData = try await generatePNGImage(panels: panels, options: options)
-                    continuation.resume(returning: pngData)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        // PNG generation uses UIGraphicsImageRenderer which is safe off-main-thread.
+        return try await generatePNGImage(panels: panels, options: options)
         #else
         // Fallback for non-iOS platforms
         throw ExportError.unsupportedFeature("PNG generation requires iOS/iPadOS")
@@ -433,7 +425,6 @@ public final class DefaultPatternExportService: PatternExportService {
         }
     }
     
-    @MainActor
     private func generatePNGImage(panels: [FlattenedPanelDTO], options: ExportOptions) async throws -> Data {
         // Calculate image dimensions at 300 DPI for print quality
         let dpi: CGFloat = 300
@@ -457,59 +448,55 @@ public final class DefaultPatternExportService: PatternExportService {
         let bounds = calculateOverallBounds(panels: panels)
         let scaleFactor = calculateScaleFactor(bounds: bounds, contentRect: contentRect, options: options)
         
-        // Create high-resolution graphics context
-        UIGraphicsBeginImageContextWithOptions(imageSize, false, 1.0)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0 // DPI handled manually via imageSize
+        format.opaque = false
         
-        guard let context = UIGraphicsGetCurrentContext() else {
-            UIGraphicsEndImageContext()
-            throw ExportError.exportFailed("Could not create PNG context")
+        let renderer = UIGraphicsImageRenderer(size: imageSize, format: format)
+        let image = renderer.image { rendererContext in
+            let context = rendererContext.cgContext
+            
+            // High quality rendering configuration
+            context.setAllowsAntialiasing(true)
+            context.setShouldAntialias(true)
+            context.interpolationQuality = .high
+            
+            // Clear background (transparent)
+            context.clear(CGRect(origin: .zero, size: imageSize))
+            
+            // Draw title and metadata
+            drawPNGHeader(context: context, size: imageSize, options: options, panelCount: panels.count, dpi: dpi)
+            
+            // Draw grid overlay if requested
+            drawGrid(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
+            
+            // Transform coordinate system for pattern drawing
+            context.saveGState()
+            context.translateBy(x: contentRect.midX, y: contentRect.midY)
+            context.scaleBy(x: scaleFactor, y: -scaleFactor) // Flip Y-axis for standard coordinates
+            context.translateBy(x: -bounds.midX, y: -bounds.midY)
+            
+            // Draw each panel with anti-aliasing
+            for (index, panel) in panels.enumerated() {
+                drawPanelInPNG(context: context, panel: panel, index: index, options: options, dpi: dpi)
+            }
+            
+            context.restoreGState()
+            
+            // Draw rulers and measurements
+            if options.includeRegistrationMarks {
+                drawPNGRulers(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
+            }
         }
         
-        // Set high-quality rendering
-        context.setAllowsAntialiasing(true)
-        context.setShouldAntialias(true)
-        context.interpolationQuality = .high
-        
-        // Clear background (transparent)
-        context.clear(CGRect(origin: .zero, size: imageSize))
-        
-        // Draw title and metadata
-        await drawPNGHeader(context: context, size: imageSize, options: options, panelCount: panels.count, dpi: dpi)
-        
-        // Draw grid overlay if requested
-        await drawGrid(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
-        
-        // Transform coordinate system for pattern drawing
-        context.saveGState()
-        context.translateBy(x: contentRect.midX, y: contentRect.midY)
-        context.scaleBy(x: scaleFactor, y: -scaleFactor) // Flip Y-axis for standard coordinates
-        context.translateBy(x: -bounds.midX, y: -bounds.midY)
-        
-        // Draw each panel with anti-aliasing
-        for (index, panel) in panels.enumerated() {
-            await drawPanelInPNG(context: context, panel: panel, index: index, options: options, dpi: dpi)
-        }
-        
-        context.restoreGState()
-        
-        // Draw rulers and measurements
-        if options.includeRegistrationMarks {
-            await drawPNGRulers(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
-        }
-        
-        guard let image = UIGraphicsGetImageFromCurrentImageContext(),
-              let pngData = image.pngData() else {
-            UIGraphicsEndImageContext()
+        guard let pngData = image.pngData() else {
             throw ExportError.exportFailed("Could not generate PNG data")
         }
-        
-        UIGraphicsEndImageContext()
         
         return pngData
     }
     
-    @MainActor
-    private func drawPNGHeader(context: CGContext, size: CGSize, options: ExportOptions, panelCount: Int, dpi: CGFloat) async {
+    private func drawPNGHeader(context: CGContext, size: CGSize, options: ExportOptions, panelCount: Int, dpi: CGFloat) {
         let scaleFactor = dpi / 72
         let fontSize: CGFloat = 16 * scaleFactor
         let smallFontSize: CGFloat = 12 * scaleFactor
@@ -544,8 +531,7 @@ public final class DefaultPatternExportService: PatternExportService {
         timestamp.draw(in: timestampRect, withAttributes: subtitleAttributes)
     }
     
-    @MainActor
-    private func drawGrid(context: CGContext, contentRect: CGRect, scaleFactor: CGFloat, dpi: CGFloat) async {
+    private func drawGrid(context: CGContext, contentRect: CGRect, scaleFactor: CGFloat, dpi: CGFloat) {
         let gridSpacing: CGFloat = 36 * dpi / 72 // 0.5 inch grid at high resolution
         
         context.saveGState()
@@ -572,8 +558,7 @@ public final class DefaultPatternExportService: PatternExportService {
         context.restoreGState()
     }
     
-    @MainActor
-    private func drawPanelInPNG(context: CGContext, panel: FlattenedPanelDTO, index: Int, options: ExportOptions, dpi: CGFloat) async {
+    private func drawPanelInPNG(context: CGContext, panel: FlattenedPanelDTO, index: Int, options: ExportOptions, dpi: CGFloat) {
         guard !panel.points2D.isEmpty else { return }
         
         context.saveGState()
@@ -640,8 +625,7 @@ public final class DefaultPatternExportService: PatternExportService {
         context.restoreGState()
     }
     
-    @MainActor
-    private func drawPNGRulers(context: CGContext, contentRect: CGRect, scaleFactor: CGFloat, dpi: CGFloat) async {
+    private func drawPNGRulers(context: CGContext, contentRect: CGRect, scaleFactor: CGFloat, dpi: CGFloat) {
         context.saveGState()
         context.setStrokeColor(UIColor.black.cgColor)
         context.setLineWidth(1.0 * dpi / 72)

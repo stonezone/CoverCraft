@@ -145,6 +145,9 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         // Build mesh connectivity
         let connectivity = try buildMeshConnectivity(meshData)
         
+        // Ensure the panel mesh is a single connected component to avoid numerical instability
+        try validateSingleComponent(connectivity: connectivity)
+        
         // Find boundary vertices and parameterize them on unit circle
         let boundary = try findBoundaryVertices(connectivity)
         guard boundary.count >= 3 else {
@@ -156,6 +159,11 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         
         // Solve the linear system using Accelerate sparse solver
         let uvCoordinates = try solveLSCMSystem(lscmSystem)
+        
+        // Guard against non-finite UV coordinates which would corrupt downstream geometry
+        guard uvCoordinates.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else {
+            throw FlatteningError.flatteningFailed("Non-finite UV coordinates produced by LSCM solver")
+        }
         
         // Scale UV coordinates to real-world units and add seam allowances
         let scaledPoints = try scaleAndAddSeamAllowances(
@@ -267,6 +275,32 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             edgeToTriangles: edgeToTriangles,
             triangles: meshData.triangles
         )
+    }
+    
+    /// Validate that the panel mesh forms a single connected component.
+    /// Disconnected islands (often scanning noise) can cause LSCM to become unstable.
+    private func validateSingleComponent(connectivity: MeshConnectivity) throws {
+        guard let startVertex = connectivity.adjacency.keys.first else {
+            throw FlatteningError.degenerateGeometry
+        }
+        
+        var visited = Set<Int>()
+        var stack: [Int] = [startVertex]
+        visited.insert(startVertex)
+        
+        while let vertex = stack.popLast() {
+            if let neighbors = connectivity.adjacency[vertex] {
+                for neighbor in neighbors where !visited.contains(neighbor) {
+                    visited.insert(neighbor)
+                    stack.append(neighbor)
+                }
+            }
+        }
+        
+        // If not all vertices were visited, we have multiple connected components
+        if visited.count != connectivity.adjacency.count {
+            throw FlatteningError.flatteningFailed("Panel mesh has multiple disconnected components")
+        }
     }
     
     /// Find boundary vertices using edge-triangle connectivity

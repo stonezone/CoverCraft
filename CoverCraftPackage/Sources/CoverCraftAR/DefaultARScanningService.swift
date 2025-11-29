@@ -131,55 +131,80 @@ public final class DefaultARScanningService: ARScanningService {
     // MARK: - Private Methods
     
     private func combineMeshAnchors(_ anchors: [ARMeshAnchor]) async throws -> MeshDTO {
-        var allVertices: [SIMD3<Float>] = []
-        var allTriangleIndices: [Int] = []
-        var vertexOffset = 0
-        
-        for anchor in anchors {
-            let meshGeometry = anchor.geometry
-            
-            // Extract vertices
-            let vertices = meshGeometry.vertices
-            let vertexBuffer = vertices.buffer.contents()
-            let vertexStride = vertices.stride
-            let vertexCount = vertices.count
-            
-            for i in 0..<vertexCount {
-                let offset = i * vertexStride
-                let vertex = vertexBuffer.advanced(by: offset).assumingMemoryBound(to: SIMD3<Float>.self).pointee
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var allVertices: [SIMD3<Float>] = []
+                var allTriangleIndices: [Int] = []
+                var vertexOffset = 0
                 
-                // Transform vertex by anchor transform
-                let worldVertex = anchor.transform * SIMD4<Float>(vertex, 1.0)
-                allVertices.append(SIMD3<Float>(worldVertex.x, worldVertex.y, worldVertex.z))
-            }
-            
-            // Extract triangle indices
-            let faces = meshGeometry.faces
-            let faceBuffer = faces.buffer.contents()
-            let faceCount = faces.count
-            let bytesPerIndex = faces.bytesPerIndex
-            
-            for i in 0..<faceCount {
-                let offset = i * faces.indexCountPerPrimitive * bytesPerIndex
-                let face = faceBuffer.advanced(by: offset).assumingMemoryBound(to: (UInt32, UInt32, UInt32).self).pointee
+                for anchor in anchors {
+                    let meshGeometry = anchor.geometry
+                    
+                    // Extract vertices
+                    let vertices = meshGeometry.vertices
+                    let vertexBuffer = vertices.buffer.contents()
+                    let vertexStride = vertices.stride
+                    let vertexCount = vertices.count
+                    
+                    for i in 0..<vertexCount {
+                        let offset = i * vertexStride
+                        let vertex = vertexBuffer
+                            .advanced(by: offset)
+                            .assumingMemoryBound(to: SIMD3<Float>.self)
+                            .pointee
+                        
+                        // Transform vertex by anchor transform
+                        let worldVertex4 = anchor.transform * SIMD4<Float>(vertex, 1.0)
+                        let worldVertex = SIMD3<Float>(worldVertex4.x, worldVertex4.y, worldVertex4.z)
+                        allVertices.append(worldVertex)
+                    }
+                    
+                    // Extract triangle indices
+                    let faces = meshGeometry.faces
+                    let faceBuffer = faces.buffer.contents()
+                    let faceCount = faces.count
+                    let bytesPerIndex = faces.bytesPerIndex
+                    
+                    for i in 0..<faceCount {
+                        let offset = i * faces.indexCountPerPrimitive * bytesPerIndex
+                        
+                        switch bytesPerIndex {
+                        case 2:
+                            let indexPtr = faceBuffer
+                                .advanced(by: offset)
+                                .assumingMemoryBound(to: UInt16.self)
+                            let i0 = Int(indexPtr[0]) + vertexOffset
+                            let i1 = Int(indexPtr[1]) + vertexOffset
+                            let i2 = Int(indexPtr[2]) + vertexOffset
+                            allTriangleIndices.append(contentsOf: [i0, i1, i2])
+                        case 4:
+                            let indexPtr = faceBuffer
+                                .advanced(by: offset)
+                                .assumingMemoryBound(to: UInt32.self)
+                            let i0 = Int(indexPtr[0]) + vertexOffset
+                            let i1 = Int(indexPtr[1]) + vertexOffset
+                            let i2 = Int(indexPtr[2]) + vertexOffset
+                            allTriangleIndices.append(contentsOf: [i0, i1, i2])
+                        default:
+                            continue
+                        }
+                    }
+                    
+                    vertexOffset += vertexCount
+                }
                 
-                // Adjust indices by vertex offset
-                allTriangleIndices.append(Int(face.0) + vertexOffset)
-                allTriangleIndices.append(Int(face.1) + vertexOffset)
-                allTriangleIndices.append(Int(face.2) + vertexOffset)
+                guard !allVertices.isEmpty && !allTriangleIndices.isEmpty else {
+                    continuation.resume(throwing: ARScanningError.insufficientData)
+                    return
+                }
+                
+                let mesh = MeshDTO(
+                    vertices: allVertices,
+                    triangleIndices: allTriangleIndices
+                )
+                continuation.resume(returning: mesh)
             }
-            
-            vertexOffset += vertexCount
         }
-        
-        guard !allVertices.isEmpty && !allTriangleIndices.isEmpty else {
-            throw ARScanningError.insufficientData
-        }
-        
-        return MeshDTO(
-            vertices: allVertices,
-            triangleIndices: allTriangleIndices
-        )
     }
 }
 
