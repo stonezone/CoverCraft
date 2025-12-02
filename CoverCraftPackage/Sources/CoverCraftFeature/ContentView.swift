@@ -32,6 +32,8 @@ public struct ContentView: View {
     @State private var showingScanner = false
     @State private var showingHelp = false
     @State private var isGeneratingPattern = false
+    @State private var errorMessage: String?
+    @State private var showErrorAlert = false
     
     public init() {}
     
@@ -41,6 +43,7 @@ public struct ContentView: View {
         NavigationStack {
             List {
                 scanSection
+                processingSection
                 calibrationSection
                 segmentationSection
                 exportSection
@@ -64,6 +67,11 @@ public struct ContentView: View {
                 }
                 Button("OK", role: .cancel) { }
             }
+            .alert("Pattern Generation Failed", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "Unknown error occurred")
+            }
         }
     }
     
@@ -74,34 +82,96 @@ public struct ContentView: View {
             Button(action: { showingScanner = true }) {
                 Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
             }
-            
+
             if let meshDTO = appState.currentMesh {
-                HStack {
-                    Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
-                        .font(.caption)
-                    Spacer()
-                    Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
-                        .font(.caption)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
+                            .font(.caption)
+                        Spacer()
+                        Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+
+                    // Mesh quality info
+                    let boundaryInfo = meshDTO.analyzeBoundaries()
+                    HStack {
+                        if boundaryInfo.isWatertight {
+                            Label("Watertight", systemImage: "checkmark.seal.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Label("\(boundaryInfo.holeCount) hole\(boundaryInfo.holeCount == 1 ? "" : "s")", systemImage: "circle.dashed")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                        Spacer()
+                        if !boundaryInfo.isWatertight {
+                            Text("\(boundaryInfo.boundaryEdges.count) boundary edges")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
-                .foregroundColor(.secondary)
             }
         } header: {
             Text("1. Scan Object")
         }
     }
     
+    private var processingSection: some View {
+        Section {
+            NavigationLink {
+                if let mesh = appState.currentMesh {
+                    MeshProcessingView(
+                        mesh: mesh,
+                        processedMesh: $appState.processedMesh,
+                        options: $appState.processingOptions
+                    )
+                }
+            } label: {
+                HStack {
+                    Label("Clean Up Mesh", systemImage: "wand.and.rays")
+                    Spacer()
+                    if appState.hasProcessedMesh {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            .disabled(appState.currentMesh == nil)
+
+            if appState.hasProcessedMesh, let processed = appState.processedMesh {
+                HStack {
+                    Text("Using processed mesh")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(processed.triangleCount) triangles")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        } header: {
+            Text("1b. Mesh Cleanup (Optional)")
+        } footer: {
+            Text("Fill holes, remove floor, and isolate your object")
+        }
+    }
+
     private var calibrationSection: some View {
         Section {
             NavigationLink {
                 CalibrationView(
-                    mesh: appState.currentMesh,
-                    calibrationData: appState.calibrationData
+                    mesh: appState.effectiveMesh,
+                    calibrationData: $appState.calibrationData
                 )
             } label: {
                 Label("Set Real-World Scale", systemImage: "ruler")
             }
-            .disabled(appState.currentMesh == nil)
-            
+            .disabled(appState.effectiveMesh == nil)
+
             if appState.calibrationData.isComplete {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
@@ -123,17 +193,17 @@ public struct ContentView: View {
                 }
             }
             .pickerStyle(.menu)
-            
+
             NavigationLink {
                 SegmentationPreview(
-                    mesh: appState.currentMesh,
+                    mesh: appState.effectiveMesh,
                     resolution: appState.selectedResolution,
                     panels: $appState.currentPanels
                 )
             } label: {
                 Label("Preview Segmentation", systemImage: "square.grid.3x3")
             }
-            .disabled(appState.currentMesh == nil)
+            .disabled(appState.effectiveMesh == nil)
         } header: {
             Text("3. Panel Configuration")
         } footer: {
@@ -180,21 +250,21 @@ public struct ContentView: View {
     
     private func generatePattern() {
         guard appState.canGeneratePattern else { return }
-        
+
         guard
             let segmenter = segmentationService,
             let flattener = flatteningService,
-            let currentMesh = appState.currentMesh
+            let meshToUse = appState.effectiveMesh
         else {
             print("CRITICAL: Required services not registered in dependency container")
             return
         }
-        
+
         isGeneratingPattern = true
-        
+
         Task {
             do {
-                let scaledMesh = currentMesh.scaled(by: appState.calibrationData.scaleFactor)
+                let scaledMesh = meshToUse.scaled(by: appState.calibrationData.scaleFactor)
                 let panels = try await segmenter.segmentMesh(
                     scaledMesh,
                     targetPanelCount: appState.selectedResolution.targetPanelCount
@@ -211,8 +281,8 @@ public struct ContentView: View {
             } catch {
                 await MainActor.run {
                     isGeneratingPattern = false
-                    // TODO: Show error alert to user
-                    print("Pattern generation failed: \(error.localizedDescription)")
+                    errorMessage = error.localizedDescription
+                    showErrorAlert = true
                 }
             }
         }

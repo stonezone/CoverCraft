@@ -502,16 +502,16 @@ public final class TestDataFactory {
     ///   - isValid: Whether validation should pass (default: true)
     ///   - errorCount: Number of errors to include (default: 0)
     ///   - warningCount: Number of warnings to include (default: 0)
-    /// - Returns: ValidationResult for testing
+    /// - Returns: ExportValidationResult for testing
     public static func createTestValidationResult(
         isValid: Bool = true,
         errorCount: Int = 0,
         warningCount: Int = 0
-    ) -> ValidationResult {
+    ) -> ExportValidationResult {
         let errors = (0..<errorCount).map { "Test error \($0 + 1)" }
         let warnings = (0..<warningCount).map { "Test warning \($0 + 1)" }
-        
-        return ValidationResult(
+
+        return ExportValidationResult(
             isValid: isValid && errors.isEmpty,
             errors: errors,
             warnings: warnings
@@ -550,36 +550,36 @@ public final class TestDataFactory {
 
 @available(iOS 18.0, macOS 15.0, *)
 public extension TestDataFactory {
-    
+
     /// Create data for edge case testing
     struct EdgeCases {
-        
+
         /// Create empty mesh for boundary testing
-        static func emptyMesh() -> MeshDTO {
+        public static func emptyMesh() -> MeshDTO {
             return MeshDTO(vertices: [], triangleIndices: [])
         }
-        
+
         /// Create minimal valid mesh
-        static func minimalMesh() -> MeshDTO {
+        public static func minimalMesh() -> MeshDTO {
             return TestDataFactory.createTriangleMesh()
         }
-        
+
         /// Create mesh with maximum reasonable size
-        static func largeMesh() -> MeshDTO {
+        public static func largeMesh() -> MeshDTO {
             return TestDataFactory.createComplexMesh(complexity: 5)
         }
-        
+
         /// Create panel with no triangles
-        static func emptyPanel() -> PanelDTO {
+        public static func emptyPanel() -> PanelDTO {
             return PanelDTO(
                 vertexIndices: [],
                 triangleIndices: [],
                 color: .red
             )
         }
-        
+
         /// Create flattened panel with minimal area
-        static func tinyFlattenedPanel() -> FlattenedPanelDTO {
+        public static func tinyFlattenedPanel() -> FlattenedPanelDTO {
             let points = [
                 CGPoint(x: 0, y: 0),
                 CGPoint(x: 0.1, y: 0),
@@ -599,9 +599,9 @@ public extension TestDataFactory {
                 scaleUnitsPerMeter: 1000.0
             )
         }
-        
+
         /// Create incomplete calibration
-        static func incompleteCalibration() -> CalibrationDTO {
+        public static func incompleteCalibration() -> CalibrationDTO {
             return CalibrationDTO(
                 firstPoint: SIMD3<Float>(0, 0, 0),
                 secondPoint: nil,

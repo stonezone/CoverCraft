@@ -17,9 +17,21 @@ typealias PlatformFont = NSFont
 typealias PlatformImage = NSImage
 #endif
 
-/// Export patterns to various formats with real-world scaling
+/// LEGACY: Actor-based pattern exporter with direct export API
+///
+/// Architecture Note:
+/// This is a legacy implementation that provides actor-based isolation for export operations.
+/// For new code, use DefaultPatternExportService which implements the PatternExportService protocol.
+/// This exporter is maintained for compatibility with existing code that uses the direct exportPattern() API.
+///
+/// Key Differences from DefaultPatternExportService:
+/// - Actor-based (provides automatic isolation)
+/// - Direct export API (returns URL instead of ExportResult)
+/// - Simpler rendering pipeline
+/// - Does NOT implement PatternExportService protocol to avoid DI ambiguity
+///
 @available(iOS 18.0, macOS 15.0, *)
-public actor PatternExporter: PatternExportService {
+public actor PatternExporter {
     
     public init() {}
     
@@ -40,33 +52,6 @@ public actor PatternExporter: PatternExportService {
         case .dxf:
             return try await exportToDXF(panels)
         }
-    }
-    
-    // MARK: - PatternExportService Protocol Methods
-    
-    public func exportPatterns(_ panels: [FlattenedPanelDTO], format: ExportFormat, options: ExportOptions) async throws -> ExportResult {
-        let url = try await exportPattern(panels, format: format)
-        let data = try Data(contentsOf: url)
-        let filename = url.lastPathComponent
-        return ExportResult(data: data, format: format, filename: filename)
-    }
-    
-    nonisolated public func getSupportedFormats() -> [ExportFormat] {
-        return [.png, .gif, .svg, .pdf]
-    }
-    
-    nonisolated public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
-        if panels.isEmpty {
-            return ExportValidationResult(isValid: false, errors: ["No panels provided for export"])
-        }
-        
-        for panel in panels {
-            if panel.points2D.isEmpty {
-                return ExportValidationResult(isValid: false, errors: ["Panel contains no points"])
-            }
-        }
-        
-        return ExportValidationResult(isValid: true, errors: [])
     }
     
     // MARK: - PNG Export

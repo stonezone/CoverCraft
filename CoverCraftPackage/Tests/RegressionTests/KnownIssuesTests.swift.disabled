@@ -15,7 +15,6 @@ import CoverCraftExport
 import TestUtilities
 
 @Suite("Known Issues and Regression Tests")
-@available(iOS 18.0, macOS 15.0, *)
 struct KnownIssuesTests {
     
     let calibrationService: DefaultCalibrationService

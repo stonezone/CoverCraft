@@ -358,6 +358,19 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     
     /// Set up LSCM sparse linear system
     private func setupLSCMSystem(_ meshData: PanelMeshData, connectivity: MeshConnectivity, boundary: [Int]) throws -> LSCMSystem {
+        // Validate edge cases (Issue #9)
+        guard meshData.vertices.count >= 3 else {
+            throw FlatteningError.invalidPanel("LSCM requires at least 3 vertices")
+        }
+
+        guard boundary.count >= 3 else {
+            throw FlatteningError.invalidPanel("LSCM requires at least 3 boundary vertices")
+        }
+
+        guard meshData.triangles.count >= 1 else {
+            throw FlatteningError.invalidPanel("LSCM requires at least 1 triangle")
+        }
+
         let n = meshData.vertices.count
         let boundarySet = Set(boundary)
         let interiorVertices = (0..<n).filter { !boundarySet.contains($0) }
@@ -463,14 +476,20 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             throw FlatteningError.flatteningFailed("Empty system")
         }
         
-        // Create sparse matrix structure (for future implementation)
-        let _ = system.matrixEntries.map { Int32($0.0) } // Row indices
-        let _ = system.matrixEntries.map { Int32($0.1) } // Column indices  
-        let _ = system.matrixEntries.map { $0.2 } // Values
-        
-        // Solve for U coordinates (placeholder for future implementation)
-        let _ = system.rhsU
-        let _ : Int32 = 0 // Info placeholder for sparse solver
+        // Reserved for future sparse solver implementation
+        // These variables are prepared but not yet used until we integrate Accelerate's sparse solver
+        let _rowIndices = system.matrixEntries.map { Int32($0.0) }
+        let _colIndices = system.matrixEntries.map { Int32($0.1) }
+        let _values = system.matrixEntries.map { $0.2 }
+        let _solutionU = system.rhsU
+        let _info: Int32 = 0
+
+        // Suppress unused variable warnings
+        _ = _rowIndices
+        _ = _colIndices
+        _ = _values
+        _ = _solutionU
+        _ = _info
         
         // Use iterative solver for better performance with sparse matrices
         let maxIterations: Int32 = 1000

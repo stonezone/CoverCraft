@@ -22,6 +22,20 @@ public protocol ARScanningService: Sendable {
     func isARAvailable() -> Bool
 }
 
+/// Provider for AR scan view controllers (factory pattern for DI)
+/// This allows the UI layer to obtain configured view controllers through dependency injection
+#if canImport(UIKit)
+import UIKit
+
+@available(iOS 18.0, *)
+public protocol ARScanViewControllerProvider: Sendable {
+    /// Create a new AR scan view controller
+    /// - Parameter onScanComplete: Callback invoked when scanning finishes with the captured mesh
+    /// - Returns: Configured UIViewController for AR scanning
+    @MainActor func makeViewController(onScanComplete: @escaping @Sendable (MeshDTO) -> Void) -> UIViewController
+}
+#endif
+
 /// Service for AR session management
 @available(iOS 18.0, macOS 15.0, *)
 public protocol ARSessionService: Sendable {

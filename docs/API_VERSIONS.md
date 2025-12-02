@@ -12,6 +12,21 @@ The CoverCraft application currently operates entirely offline with no external 
 |---------|--------|---------|---------|---------------|--------------|
 | None | - | - | - | - | - |
 
+## Swift Package Dependencies
+
+### Third-Party Swift Packages
+
+| Package | Version | Purpose | Status | Documentation |
+|---------|---------|---------|--------|---------------|
+| swift-log | 1.6.1 | Structured logging framework | ✅ Active | [GitHub](https://github.com/apple/swift-log) |
+| swift-metrics | 2.5.0 | Metrics collection framework | ✅ Active | [GitHub](https://github.com/apple/swift-metrics) |
+| swift-snapshot-testing | 1.17.4 | Snapshot testing for UI/data | ✅ Active | [GitHub](https://github.com/pointfreeco/swift-snapshot-testing) |
+
+**Dependency Management Strategy:**
+- Using exact version pinning for stability and reproducibility
+- All dependencies are from trusted sources (Apple, Point-Free)
+- Regular updates reviewed for security and compatibility
+
 ## Apple Framework API Usage
 
 ### ARKit APIs
@@ -141,6 +156,6 @@ All APIs in use are current and supported in iOS 18.0+.
 
 ---
 
-*Last Updated: 2025-01-14*  
-*Review Schedule: After each iOS release*  
+*Last Updated: 2025-12-01*
+*Review Schedule: After each iOS release*
 *Next Review: After iOS 18.1 release*

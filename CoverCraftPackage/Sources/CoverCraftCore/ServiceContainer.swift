@@ -33,7 +33,9 @@ public enum ServiceContainerError: Error, LocalizedError {
     }
 }
 
-/// Default implementation of dependency injection container - thread-safe with internal locking
+/// Thread-safe dependency injection container.
+/// Uses @unchecked Sendable with NSLock for thread safety.
+/// This is safe because all mutable state (services, factories) is protected by `lock`.
 public final class DefaultDependencyContainer: DependencyContainer, @unchecked Sendable {
     private let lock = NSLock()
     private var services: [String: Any] = [:]
@@ -145,6 +147,19 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
             services[key] != nil || factories[key] != nil
         }
     }
+}
+
+// MARK: - Dependency Container Provider Protocol
+
+/// Protocol for providing DI containers - enables test substitution
+public protocol DependencyContainerProvider: Sendable {
+    var container: DependencyContainer { get }
+}
+
+/// Default provider using shared container
+public struct DefaultContainerProvider: DependencyContainerProvider {
+    public var container: DependencyContainer { DefaultDependencyContainer.shared }
+    public init() {}
 }
 
 // MARK: - SwiftUI Integration

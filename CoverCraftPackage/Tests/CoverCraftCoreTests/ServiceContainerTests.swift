@@ -1,11 +1,12 @@
 // Version: 1.0.0
 // CoverCraft Core Tests - Service Container Tests
 
+import Foundation
 import Testing
 @testable import CoverCraftCore
 
-@Suite("ServiceContainer Tests")
 @MainActor
+@Suite("ServiceContainer Tests")
 struct ServiceContainerTests {
     
     @Test("Service registration and resolution")

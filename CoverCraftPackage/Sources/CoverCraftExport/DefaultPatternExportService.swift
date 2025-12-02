@@ -15,7 +15,27 @@ import AppKit
 import PDFKit
 #endif
 
-/// Default implementation of pattern export service
+/// Production implementation of PatternExportService protocol
+///
+/// Architecture Note:
+/// This is the PRIMARY implementation of PatternExportService and should be used for all new code.
+/// It provides comprehensive export functionality with high-quality rendering for PDF, PNG, SVG, and GIF formats.
+///
+/// Features:
+/// - High-resolution rendering (300 DPI for PNG, 72 DPI for PDF/SVG)
+/// - Proper seam allowance visualization
+/// - Registration marks and scale references
+/// - Multi-page layout support
+/// - Comprehensive metadata embedding
+/// - Thread-safe operation
+///
+/// Dependency Injection:
+/// This service is registered in ServiceContainer via registerExportServices()
+/// Retrieve it using: container.resolve(PatternExportService.self)
+///
+/// Related Types:
+/// - PatternExporter: Legacy actor-based exporter (maintained for compatibility)
+///
 @available(iOS 18.0, macOS 15.0, *)
 public final class DefaultPatternExportService: PatternExportService {
     

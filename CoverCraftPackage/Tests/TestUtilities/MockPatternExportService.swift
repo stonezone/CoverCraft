@@ -35,7 +35,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
     public var mockSupportedFormats: [ExportFormat] = ExportFormat.allCases
     
     /// Mock validation result to return from validateForExport
-    public var mockValidationResult: ValidationResult = ValidationResult(isValid: true)
+    public var mockValidationResult: ExportValidationResult = ExportValidationResult(isValid: true)
     
     /// Delay for async operations (for testing timing scenarios)
     public var mockAsyncDelay: TimeInterval = 0.0
@@ -84,7 +84,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
         initialState: MockState = .ready,
         exportResult: ExportResult? = nil,
         supportedFormats: [ExportFormat] = ExportFormat.allCases,
-        validationResult: ValidationResult = ValidationResult(isValid: true)
+        validationResult: ExportValidationResult = ExportValidationResult(isValid: true)
     ) {
         self.mockState = initialState
         self.mockExportResult = exportResult
@@ -138,7 +138,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
         return mockSupportedFormats
     }
     
-    public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult {
+    public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
         validateForExportCallCount += 1
         lastValidatePanels = panels
         lastValidateFormat = format
@@ -159,12 +159,12 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
             } else {
                 return mockValidationResult
             }
-            
+
         case .exporting:
-            return ValidationResult(isValid: false, errors: ["Cannot validate while exporting"])
-            
+            return ExportValidationResult(isValid: false, errors: ["Cannot validate while exporting"])
+
         case .error:
-            return ValidationResult(isValid: false, errors: ["Service in error state"])
+            return ExportValidationResult(isValid: false, errors: ["Service in error state"])
         }
     }
     
@@ -228,7 +228,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
         return content.data(using: .utf8) ?? Data()
     }
     
-    private func generateValidationResult(for panels: [FlattenedPanelDTO], format: ExportFormat) -> ValidationResult {
+    private func generateValidationResult(for panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
         var errors: [String] = []
         var warnings: [String] = []
         
@@ -263,7 +263,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
             }
         }
         
-        return ValidationResult(
+        return ExportValidationResult(
             isValid: errors.isEmpty,
             errors: errors,
             warnings: warnings
@@ -317,7 +317,7 @@ public final class MockPatternExportService: PatternExportService, @unchecked Se
     
     /// Configure mock validation result
     /// - Parameter result: Validation result to return
-    public func configureMockValidationResult(_ result: ValidationResult) {
+    public func configureMockValidationResult(_ result: ExportValidationResult) {
         mockValidationResult = result
     }
     
@@ -428,7 +428,7 @@ public extension MockPatternExportService {
     /// Create a mock service that fails validation
     /// - Returns: Configured mock service with validation failures
     static func withValidationFailure() -> MockPatternExportService {
-        let validationResult = ValidationResult(
+        let validationResult = ExportValidationResult(
             isValid: false,
             errors: ["Test validation error"],
             warnings: ["Test validation warning"]

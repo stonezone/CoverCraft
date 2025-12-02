@@ -7,6 +7,9 @@ import UIKit
 import ARKit
 import SceneKit
 import simd
+import Logging
+import CoverCraftCore
+import CoverCraftDTO
 
 /// Mesh data structure for AR scanned geometry
 public struct Mesh {
@@ -21,18 +24,28 @@ public struct Mesh {
 
 /// View controller handling AR scanning with LiDAR - Polycam style
 public final class ARScanViewController: UIViewController {
-    
+
     // MARK: - Properties
-    
+
     private var sceneView: ARSCNView!
     private var coachingOverlay: ARCoachingOverlayView!
     private var finishButton: UIButton!
     private var vertexCountLabel: UILabel!
-    
+    private var depthSlider: UISlider!
+    private var depthLabel: UILabel!
+    private var depthLimitIndicator: SCNNode?
+
     // Mesh data storage
     private var collectedMeshAnchors: [UUID: ARMeshAnchor] = [:]
-    
+
+    // Depth limiting - default 2 meters, range 0.3m to 5m
+    private var maxDepth: Float = 2.0
+    private var lastCameraTransform: simd_float4x4?
+
     public var onScanComplete: ((Mesh) -> Void)?
+
+    // Logger for AR scanning events
+    private let logger = Logger(label: "com.covercraft.ar.scan")
     
     // MARK: - Lifecycle
     
@@ -42,8 +55,9 @@ public final class ARScanViewController: UIViewController {
         setupCoachingOverlay()
         setupFinishButton()
         setupVertexCountLabel()
-        
-        print("POLYCAM: ARScanViewController loaded")
+        setupDepthSlider()
+
+        logger.info("ARScanViewController loaded")
     }
     
     public override func viewWillAppear(_ animated: Bool) {
@@ -74,8 +88,8 @@ public final class ARScanViewController: UIViewController {
         sceneView.showsStatistics = true
         
         view.addSubview(sceneView)
-        
-        print("POLYCAM: ARSCNView setup complete with delegates")
+
+        logger.debug("ARSCNView setup complete with delegates")
     }
     
     private func setupCoachingOverlay() {
@@ -131,31 +145,114 @@ public final class ARScanViewController: UIViewController {
             vertexCountLabel.heightAnchor.constraint(equalToConstant: 40)
         ])
     }
-    
+
+    private func setupDepthSlider() {
+        // Depth label
+        depthLabel = UILabel()
+        depthLabel.text = "Max Depth: 2.0m"
+        depthLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        depthLabel.textColor = .white
+        depthLabel.textAlignment = .center
+        depthLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(depthLabel)
+
+        // Depth slider
+        depthSlider = UISlider()
+        depthSlider.minimumValue = 0.3
+        depthSlider.maximumValue = 5.0
+        depthSlider.value = maxDepth
+        depthSlider.minimumTrackTintColor = .systemBlue
+        depthSlider.maximumTrackTintColor = .gray
+        depthSlider.addTarget(self, action: #selector(depthSliderChanged), for: .valueChanged)
+        depthSlider.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(depthSlider)
+
+        // Min/Max labels
+        let minLabel = UILabel()
+        minLabel.text = "0.3m"
+        minLabel.font = .systemFont(ofSize: 12)
+        minLabel.textColor = .lightGray
+        minLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(minLabel)
+
+        let maxLabel = UILabel()
+        maxLabel.text = "5m"
+        maxLabel.font = .systemFont(ofSize: 12)
+        maxLabel.textColor = .lightGray
+        maxLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(maxLabel)
+
+        NSLayoutConstraint.activate([
+            depthLabel.bottomAnchor.constraint(equalTo: finishButton.topAnchor, constant: -60),
+            depthLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            depthSlider.topAnchor.constraint(equalTo: depthLabel.bottomAnchor, constant: 8),
+            depthSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 50),
+            depthSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -50),
+
+            minLabel.topAnchor.constraint(equalTo: depthSlider.bottomAnchor, constant: 4),
+            minLabel.leadingAnchor.constraint(equalTo: depthSlider.leadingAnchor),
+
+            maxLabel.topAnchor.constraint(equalTo: depthSlider.bottomAnchor, constant: 4),
+            maxLabel.trailingAnchor.constraint(equalTo: depthSlider.trailingAnchor)
+        ])
+    }
+
+    @objc private func depthSliderChanged(_ sender: UISlider) {
+        maxDepth = sender.value
+        depthLabel.text = String(format: "Max Depth: %.1fm", maxDepth)
+        updateDepthIndicator()
+    }
+
+    private func updateDepthIndicator() {
+        // Remove existing indicator
+        depthLimitIndicator?.removeFromParentNode()
+
+        guard let cameraTransform = lastCameraTransform else { return }
+
+        // Create a semi-transparent sphere showing the depth limit boundary
+        let sphere = SCNSphere(radius: CGFloat(maxDepth))
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.red.withAlphaComponent(0.1)
+        material.isDoubleSided = true
+        material.fillMode = .lines
+        material.lightingModel = .constant
+        sphere.materials = [material]
+
+        let node = SCNNode(geometry: sphere)
+        // Position at camera location
+        let cameraPosition = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+        node.position = SCNVector3(cameraPosition.x, cameraPosition.y, cameraPosition.z)
+        node.name = "DepthIndicator"
+
+        sceneView.scene.rootNode.addChildNode(node)
+        depthLimitIndicator = node
+    }
+
     // MARK: - AR Session
     
     private func startARSession() {
         guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
-            print("ERROR: This device doesn't support LiDAR scanning")
+            logger.error("This device doesn't support LiDAR scanning")
             return
         }
-        
+
         let configuration = ARWorldTrackingConfiguration()
-        
+
         // CRITICAL: Enable mesh reconstruction for LiDAR
         configuration.sceneReconstruction = .meshWithClassification
-        
+
         // CRITICAL: Enable scene depth for direct LiDAR access
         configuration.frameSemantics = .sceneDepth
-        
+
         // Additional settings
         configuration.environmentTexturing = .automatic
         configuration.worldAlignment = .gravity
-        
+
         // Start fresh
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
-        
-        print("POLYCAM: AR session started with mesh reconstruction and scene depth")
+
+        logger.info("AR session started with mesh reconstruction and scene depth")
     }
     
     // MARK: - Actions
@@ -170,44 +267,93 @@ public final class ARScanViewController: UIViewController {
     }
     
     private func buildFinalMesh() -> Mesh {
+        // Get camera position for depth filtering
+        let cameraPosition: SIMD3<Float>
+        if let transform = lastCameraTransform {
+            cameraPosition = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        } else {
+            // Fallback to origin if no camera position available
+            cameraPosition = SIMD3<Float>(0, 0, 0)
+        }
+
         var allVertices: [SIMD3<Float>] = []
         var allIndices: [Int] = []
         var vertexOffset = 0
-        
+        let maxDepthSquared = maxDepth * maxDepth  // Avoid sqrt in distance checks
+
         for anchor in collectedMeshAnchors.values {
             let geometry = anchor.geometry
-            
-            // Extract vertices with proper buffer access
+
+            // Map from original vertex index to filtered vertex index
+            var vertexIndexMap: [Int: Int] = [:]
+            var anchorVertices: [SIMD3<Float>] = []
+
+            // Extract vertices with proper buffer access and depth filtering
             for i in 0..<geometry.vertices.count {
                 let stride = geometry.vertices.stride
                 let offset = geometry.vertices.offset + (stride * i)
                 let vertexPointer = geometry.vertices.buffer.contents().advanced(by: offset)
                 let localVertex = vertexPointer.assumingMemoryBound(to: SIMD3<Float>.self).pointee
-                
+
                 // Transform to world space
-                let worldPos = anchor.transform * SIMD4<Float>(localVertex, 1.0)
-                allVertices.append(SIMD3<Float>(worldPos.x, worldPos.y, worldPos.z))
+                let worldPos4 = anchor.transform * SIMD4<Float>(localVertex, 1.0)
+                let worldPos = SIMD3<Float>(worldPos4.x, worldPos4.y, worldPos4.z)
+
+                // Check distance from camera (squared to avoid sqrt)
+                let delta = worldPos - cameraPosition
+                let distanceSquared = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z
+
+                // Only include vertices within max depth
+                if distanceSquared <= maxDepthSquared {
+                    vertexIndexMap[i] = anchorVertices.count
+                    anchorVertices.append(worldPos)
+                }
             }
-            
-            // Extract face indices
+
+            // Extract face indices, only including triangles where ALL vertices are within depth
             let faceCount = geometry.faces.count
             let indexCount = faceCount * 3
-            
+
             if geometry.faces.bytesPerIndex == 2 {
                 let pointer = geometry.faces.buffer.contents().bindMemory(to: UInt16.self, capacity: indexCount)
-                for i in 0..<indexCount {
-                    allIndices.append(Int(pointer[i]) + vertexOffset)
+                for faceIdx in 0..<faceCount {
+                    let i0 = Int(pointer[faceIdx * 3])
+                    let i1 = Int(pointer[faceIdx * 3 + 1])
+                    let i2 = Int(pointer[faceIdx * 3 + 2])
+
+                    // Only include triangle if all three vertices passed depth filter
+                    if let newI0 = vertexIndexMap[i0],
+                       let newI1 = vertexIndexMap[i1],
+                       let newI2 = vertexIndexMap[i2] {
+                        allIndices.append(newI0 + vertexOffset)
+                        allIndices.append(newI1 + vertexOffset)
+                        allIndices.append(newI2 + vertexOffset)
+                    }
                 }
             } else {
                 let pointer = geometry.faces.buffer.contents().bindMemory(to: UInt32.self, capacity: indexCount)
-                for i in 0..<indexCount {
-                    allIndices.append(Int(pointer[i]) + vertexOffset)
+                for faceIdx in 0..<faceCount {
+                    let i0 = Int(pointer[faceIdx * 3])
+                    let i1 = Int(pointer[faceIdx * 3 + 1])
+                    let i2 = Int(pointer[faceIdx * 3 + 2])
+
+                    // Only include triangle if all three vertices passed depth filter
+                    if let newI0 = vertexIndexMap[i0],
+                       let newI1 = vertexIndexMap[i1],
+                       let newI2 = vertexIndexMap[i2] {
+                        allIndices.append(newI0 + vertexOffset)
+                        allIndices.append(newI1 + vertexOffset)
+                        allIndices.append(newI2 + vertexOffset)
+                    }
                 }
             }
-            
-            vertexOffset += geometry.vertices.count
+
+            // Add filtered vertices to final array
+            allVertices.append(contentsOf: anchorVertices)
+            vertexOffset += anchorVertices.count
         }
-        
+
+        logger.info("Depth filter: \(allVertices.count) vertices, \(allIndices.count / 3) triangles (max depth: \(maxDepth)m)")
         return Mesh(vertices: allVertices, triangleIndices: allIndices)
     }
 }
@@ -216,38 +362,40 @@ public final class ARScanViewController: UIViewController {
 // CRITICAL: This is how the mesh visualization actually happens!
 
 extension ARScanViewController: ARSCNViewDelegate {
-    
+
     // Called when a new anchor is added - create visualization node
-    public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        guard let meshAnchor = anchor as? ARMeshAnchor else { 
-            return nil 
+    nonisolated public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+        guard let meshAnchor = anchor as? ARMeshAnchor else {
+            return nil
         }
-        
-        print("POLYCAM: Creating node for mesh anchor \(meshAnchor.identifier)")
-        
-        // Create geometry from the mesh anchor
+
+        #if DEBUG
+        print("Creating node for mesh anchor \(meshAnchor.identifier)")
+        #endif
+
+        // Create geometry from the mesh anchor (thread-safe operation)
         let geometry = createGeometryFromMeshAnchor(meshAnchor)
-        
+
         // Create node with the geometry
         let node = SCNNode(geometry: geometry)
         node.name = "MeshNode_\(meshAnchor.identifier)"
-        
+
         return node
     }
-    
+
     // Called when an anchor is updated - update its visualization
-    public func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
-        guard let meshAnchor = anchor as? ARMeshAnchor else { 
-            return 
+    nonisolated public func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+        guard let meshAnchor = anchor as? ARMeshAnchor else {
+            return
         }
-        
+
         // Update the node's geometry with the updated mesh
         let geometry = createGeometryFromMeshAnchor(meshAnchor)
         node.geometry = geometry
     }
     
     // Create SCNGeometry from ARMeshAnchor
-    private func createGeometryFromMeshAnchor(_ anchor: ARMeshAnchor) -> SCNGeometry {
+    nonisolated private func createGeometryFromMeshAnchor(_ anchor: ARMeshAnchor) -> SCNGeometry {
         let meshGeometry = anchor.geometry
         
         // Create vertex source directly from ARMeshGeometry buffers
@@ -299,39 +447,113 @@ extension ARScanViewController: ARSCNViewDelegate {
 }
 
 // MARK: - ARSessionDelegate
+//
+// SWIFT 6 CONCURRENCY NOTES:
+// --------------------------
+// ARSessionDelegate methods are called from ARKit on a non-main thread.
+// Since ARScanViewController is a UIViewController (implicitly @MainActor),
+// these delegate methods must be marked `nonisolated` to satisfy the protocol.
+//
+// IMPORTANT: Avoid capturing ARMeshAnchor or ARFrame objects in Task closures.
+// These retain ARFrame references and cause the warning:
+// "The delegate is retaining N ARFrames"
+//
+// Pattern: Extract primitive data BEFORE dispatching to MainActor.
 
 extension ARScanViewController: ARSessionDelegate {
-    
-    // Process every frame for UI updates
-    public func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Get all mesh anchors
+
+    /// Called every frame (~60Hz). Updates UI and stores anchors for final mesh.
+    ///
+    /// - Note: This is `nonisolated` because ARSessionDelegate requires it.
+    ///   We use DispatchQueue.main.async instead of Task { @MainActor } to
+    ///   avoid ARFrame retention issues with Swift structured concurrency.
+    nonisolated public func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // STEP 1: Extract ALL data from ARKit objects synchronously
+        // This prevents ARFrame retention by not capturing ARMeshAnchor in closures
         let meshAnchors = frame.anchors.compactMap { $0 as? ARMeshAnchor }
-        
-        // Store for final mesh building
+        let totalVertices = meshAnchors.reduce(0) { $0 + $1.geometry.vertices.count }
+        let totalTriangles = meshAnchors.reduce(0) { $0 + $1.geometry.faces.count }
+        let anchorCount = meshAnchors.count
+        let timestamp = frame.timestamp
+        let cameraTransform = frame.camera.transform
+
+        // STEP 2: Extract anchor data before dispatching to avoid capturing session
+        // This prevents Swift 6 concurrency errors about sending 'session' across actor boundaries
+        var anchorData: [(UUID, ARMeshAnchor)] = []
         for anchor in meshAnchors {
-            collectedMeshAnchors[anchor.identifier] = anchor
+            anchorData.append((anchor.identifier, anchor))
         }
-        
-        // Update UI with statistics
+
+        // STEP 3: Dispatch to main thread for UI updates
+        // Using DispatchQueue instead of Task to avoid structured concurrency
+        // capturing ARMeshAnchor references
         DispatchQueue.main.async { [weak self] in
-            let totalVertices = meshAnchors.reduce(0) { $0 + $1.geometry.vertices.count }
-            let totalTriangles = meshAnchors.reduce(0) { $0 + $1.geometry.faces.count }
-            
-            self?.vertexCountLabel.text = "\(totalVertices) verts | \(totalTriangles) tris"
-            
-            // Log periodically
-            if frame.timestamp.truncatingRemainder(dividingBy: 1.0) < 0.05 {
-                print("POLYCAM: \(meshAnchors.count) anchors, \(totalVertices) vertices")
+            guard let self = self else { return }
+
+            // Store camera position for depth filtering
+            self.lastCameraTransform = cameraTransform
+
+            // Store anchors for final mesh building using pre-extracted data
+            for (identifier, meshAnchor) in anchorData {
+                self.collectedMeshAnchors[identifier] = meshAnchor
+            }
+
+            // Update UI with pre-computed statistics
+            self.vertexCountLabel.text = "\(totalVertices) verts | \(totalTriangles) tris"
+
+            // Log periodically (every ~1 second)
+            if timestamp.truncatingRemainder(dividingBy: 1.0) < 0.05 {
+                self.logger.debug("AR update: \(anchorCount) anchors, \(totalVertices) vertices")
             }
         }
     }
-    
-    public func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+
+    /// Called when new anchors are added to the session.
+    nonisolated public func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+        #if DEBUG
         for anchor in anchors {
             if let meshAnchor = anchor as? ARMeshAnchor {
-                print("POLYCAM: Added mesh anchor with \(meshAnchor.geometry.vertices.count) vertices")
+                print("Added mesh anchor with \(meshAnchor.geometry.vertices.count) vertices")
             }
         }
+        #endif
+    }
+}
+
+// MARK: - ARScanViewControllerProvider Implementation
+
+/// Default provider for AR scan view controllers
+/// This enables proper dependency injection for the AR scanning UI
+@available(iOS 18.0, *)
+public final class DefaultARScanViewControllerProvider: ARScanViewControllerProvider, @unchecked Sendable {
+
+    public init() {}
+
+    @MainActor
+    public func makeViewController(onScanComplete: @escaping @Sendable (MeshDTO) -> Void) -> UIViewController {
+        let controller = ARScanViewController()
+        controller.onScanComplete = { mesh in
+            // Convert internal Mesh to MeshDTO
+            let meshDTO = MeshDTO(
+                vertices: mesh.vertices,
+                triangleIndices: mesh.triangleIndices,
+                id: UUID(),
+                createdAt: Date()
+            )
+            onScanComplete(meshDTO)
+        }
+        return controller
+    }
+}
+
+// MARK: - Service Registration
+
+@available(iOS 18.0, *)
+public extension DefaultDependencyContainer {
+
+    /// Register AR view controller provider
+    func registerARViewControllerProvider() {
+        register(DefaultARScanViewControllerProvider(), for: ARScanViewControllerProvider.self)
     }
 }
 

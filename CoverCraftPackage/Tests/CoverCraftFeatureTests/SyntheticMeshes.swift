@@ -1,12 +1,14 @@
 import Testing
+import Foundation
 import simd
+import CoverCraftDTO
 @testable import CoverCraftFeature
 
 /// Synthetic mesh generators for testing segmentation and flattening algorithms
 enum SyntheticMeshes {
-    
+
     /// Generate a unit cube mesh with proper normals
-    static func cube() -> Mesh {
+    static func cube() -> MeshDTO {
         // 8 vertices of a unit cube centered at origin
         let vertices: [SIMD3<Float>] = [
             // Front face (z = 0.5)
@@ -44,11 +46,11 @@ enum SyntheticMeshes {
             4, 5, 1,  4, 1, 0
         ]
         
-        return Mesh(vertices: vertices, triangleIndices: triangles)
+        return MeshDTO(vertices: vertices, triangleIndices: triangles, id: UUID(), createdAt: Date())
     }
-    
+
     /// Generate a cylinder mesh with specified parameters
-    static func cylinder(segments: Int, height: Float, radius: Float) -> Mesh {
+    static func cylinder(segments: Int, height: Float, radius: Float) -> MeshDTO {
         guard segments >= 3 else {
             // Fallback to triangle for invalid input
             return triangle()
@@ -118,11 +120,11 @@ enum SyntheticMeshes {
             triangles.append(contentsOf: [bottomNext, topNext, topCurrent])
         }
         
-        return Mesh(vertices: vertices, triangleIndices: triangles)
+        return MeshDTO(vertices: vertices, triangleIndices: triangles, id: UUID(), createdAt: Date())
     }
-    
+
     /// Generate a simple triangle for minimal testing
-    static func triangle() -> Mesh {
+    static func triangle() -> MeshDTO {
         let vertices: [SIMD3<Float>] = [
             SIMD3<Float>(0, 1, 0),    // top
             SIMD3<Float>(-1, -1, 0),  // bottom-left
@@ -130,12 +132,12 @@ enum SyntheticMeshes {
         ]
         
         let triangles: [Int] = [0, 1, 2]
-        
-        return Mesh(vertices: vertices, triangleIndices: triangles)
+
+        return MeshDTO(vertices: vertices, triangleIndices: triangles, id: UUID(), createdAt: Date())
     }
-    
+
     /// Generate a more complex mesh for stress testing
-    static func icosahedron() -> Mesh {
+    static func icosahedron() -> MeshDTO {
         let phi = (1.0 + sqrt(5.0)) / 2.0 // Golden ratio
         let inv_norm = 1.0 / sqrt(phi * phi + 1.0)
         
@@ -164,7 +166,7 @@ enum SyntheticMeshes {
             4, 9, 5,  2, 4, 11,  6, 2, 10,  8, 6, 7,  9, 8, 1
         ]
         
-        return Mesh(vertices: vertices, triangleIndices: triangles)
+        return MeshDTO(vertices: vertices, triangleIndices: triangles, id: UUID(), createdAt: Date())
     }
 }
 
@@ -172,7 +174,7 @@ enum SyntheticMeshes {
 
 extension SyntheticMeshes {
     /// Validate mesh has proper structure
-    static func validateMesh(_ mesh: Mesh) -> Bool {
+    static func validateMesh(_ mesh: MeshDTO) -> Bool {
         // Check triangle indices are valid
         for index in mesh.triangleIndices {
             if index < 0 || index >= mesh.vertices.count {
@@ -185,7 +187,7 @@ extension SyntheticMeshes {
     }
     
     /// Get expected panel count for known meshes
-    static func expectedPanelCount(for mesh: Mesh, target: Int) -> Int {
+    static func expectedPanelCount(for mesh: MeshDTO, target: Int) -> Int {
         let triangleCount = mesh.triangleCount
         
         if triangleCount <= 4 { // Triangle or small mesh

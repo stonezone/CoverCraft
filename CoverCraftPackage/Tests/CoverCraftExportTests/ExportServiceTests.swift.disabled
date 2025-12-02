@@ -9,9 +9,9 @@ import Foundation
 import CoverCraftDTO
 import TestUtilities
 @testable import CoverCraftExport
+@testable import CoverCraftCore
 
 @Suite("PatternExportService Tests")
-@available(iOS 18.0, macOS 15.0, *)
 struct ExportServiceTests {
     
     let service: DefaultPatternExportService

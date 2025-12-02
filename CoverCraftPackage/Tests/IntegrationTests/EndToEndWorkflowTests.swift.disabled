@@ -14,8 +14,8 @@ import CoverCraftFlattening
 import CoverCraftExport
 import TestUtilities
 
-@Suite("End-to-End Workflow Tests")
 @available(iOS 18.0, macOS 15.0, *)
+@Suite("End-to-End Workflow Tests")
 struct EndToEndWorkflowTests {
     
     let calibrationService: DefaultCalibrationService

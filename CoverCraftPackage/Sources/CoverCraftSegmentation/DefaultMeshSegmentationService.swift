@@ -15,18 +15,37 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
     private let logger = Logger(label: "com.covercraft.segmentation.enhanced")
     
     // MARK: - Configuration Constants
-    
+
     private struct Config {
+        /// Maximum K-means iterations before forced termination
         static let maxIterations = 50
+
+        /// Center movement threshold for convergence detection (in mesh units)
         static let convergenceThreshold: Float = 1e-4
+
+        /// Triangles smaller than this are considered degenerate (sq mesh units)
         static let minTriangleArea: Float = 1e-6
+
+        /// Weight for curvature in feature distance (0.0-1.0). Higher values group similar curvature regions
         static let curvatureWeight: Float = 0.3
+
+        /// Weight for surface normal similarity (0.0-1.0)
         static let normalWeight: Float = 0.4
+
+        /// Weight for spatial position (0.0-1.0)
         static let positionWeight: Float = 0.3
+
+        /// Number of iterations for boundary smoothing between panels
         static let smoothingIterations = 3
+
+        /// Smoothing factor for boundary adjustments (0.0-1.0)
         static let smoothingFactor: Float = 0.5
+
+        /// Maximum triangle count before memory warning (affects performance monitoring)
         static let maxMemoryTriangles = 100_000
-        static let timeoutSeconds = 2.0
+
+        /// Timeout for segmentation processing (seconds). Increased for complex meshes with detailed geometry.
+        static let timeoutSeconds = 60.0
     }
     
     // MARK: - Vertex Feature Structure

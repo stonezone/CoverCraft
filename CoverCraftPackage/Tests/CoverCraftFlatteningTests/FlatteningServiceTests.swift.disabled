@@ -11,8 +11,8 @@ import CoverCraftDTO
 import TestUtilities
 @testable import CoverCraftFlattening
 
-@Suite("PatternFlatteningService Tests")
 @available(iOS 18.0, macOS 15.0, *)
+@Suite("PatternFlatteningService Tests")
 struct FlatteningServiceTests {
     
     let service: DefaultPatternFlatteningService

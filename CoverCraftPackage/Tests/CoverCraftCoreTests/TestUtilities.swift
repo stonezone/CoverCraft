@@ -1,4 +1,5 @@
 import simd
+import Foundation
 import CoverCraftDTO
 @testable import CoverCraftCore
 

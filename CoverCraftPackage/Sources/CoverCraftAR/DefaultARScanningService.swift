@@ -219,7 +219,9 @@ public extension DefaultDependencyContainer {
         logger.info("Registering AR services")
         
         registerSingleton({
-            // Use unsafeAssumingIsolated to access MainActor context
+            // MainActor.assumeIsolated is safe here because registerARServices()
+            // is only called from app initialization on the main thread.
+            // If this assumption changes, convert to Task { @MainActor in ... }
             MainActor.assumeIsolated {
                 DefaultARScanningService()
             }

@@ -12,6 +12,7 @@ struct CoverCraftApp: App {
         let container = DefaultDependencyContainer.shared
         container.registerCoreServices()
         container.registerARServices()
+        container.registerARViewControllerProvider()  // NEW: Register AR view controller provider for DI
         container.registerCalibrationServices()
         container.registerSegmentationServices()
         container.registerFlatteningServices()

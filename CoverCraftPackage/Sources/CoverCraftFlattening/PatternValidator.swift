@@ -8,6 +8,45 @@ import Logging
 import CoverCraftCore
 import CoverCraftDTO
 
+/// Configuration for pattern validation parameters
+@available(iOS 18.0, macOS 15.0, *)
+public struct PatternValidatorConfig: Sendable, Codable {
+    /// Standard fabric widths in millimeters
+    public let fabricWidths: [Double]
+
+    /// Minimum seam allowance in millimeters
+    public let minimumSeamAllowance: Double
+
+    /// Maximum seam allowance in millimeters
+    public let maximumSeamAllowance: Double
+
+    /// Default configuration with common fabric widths
+    /// - 1143.0mm (45 inches)
+    /// - 1524.0mm (60 inches)
+    /// - 1372.0mm (54 inches)
+    /// - 1067.0mm (42 inches)
+    public static let `default` = PatternValidatorConfig(
+        fabricWidths: [1143.0, 1524.0, 1372.0, 1067.0],
+        minimumSeamAllowance: 3.0,
+        maximumSeamAllowance: 15.0
+    )
+
+    /// Initialize pattern validator configuration
+    /// - Parameters:
+    ///   - fabricWidths: Array of available fabric widths in millimeters
+    ///   - minimumSeamAllowance: Minimum acceptable seam allowance in millimeters (default: 3.0)
+    ///   - maximumSeamAllowance: Maximum acceptable seam allowance in millimeters (default: 15.0)
+    public init(
+        fabricWidths: [Double],
+        minimumSeamAllowance: Double = 3.0,
+        maximumSeamAllowance: Double = 15.0
+    ) {
+        self.fabricWidths = fabricWidths
+        self.minimumSeamAllowance = minimumSeamAllowance
+        self.maximumSeamAllowance = maximumSeamAllowance
+    }
+}
+
 /// Comprehensive pattern validation system for manufacturability and sewability
 ///
 /// This validator ensures that generated patterns are:
@@ -16,43 +55,33 @@ import CoverCraftDTO
 /// - Sewable (minimum dimensions, grain line consistency)
 @available(iOS 18.0, macOS 15.0, *)
 public final class PatternValidator: PatternValidationService {
-    
+
     // MARK: - Constants
-    
+
     /// Standard seam allowance in millimeters
     public static let standardSeamAllowance: Double = 5.0
-    
-    /// Minimum seam allowance in millimeters
-    public static let minimumSeamAllowance: Double = 3.0
-    
-    /// Maximum seam allowance in millimeters
-    public static let maximumSeamAllowance: Double = 15.0
-    
-    /// Standard fabric widths in millimeters
-    public static let standardFabricWidths: [Double] = [
-        1143.0, // 45 inches
-        1524.0, // 60 inches
-        1372.0, // 54 inches
-        1067.0  // 42 inches
-    ]
-    
+
     /// Minimum panel area in square millimeters (1cm²)
     public static let minimumPanelArea: Double = 100.0
-    
+
     /// Minimum edge length in millimeters
     public static let minimumEdgeLength: Double = 10.0
-    
+
     /// Maximum distortion factor for flattening validation
     public static let maximumDistortionFactor: Double = 1.5
-    
+
     // MARK: - Properties
-    
+
     private let logger = Logger(label: "com.covercraft.patternvalidator")
-    
+    private let config: PatternValidatorConfig
+
     // MARK: - Initialization
-    
-    public init() {
-        logger.info("Pattern Validator initialized")
+
+    /// Initialize pattern validator with custom configuration
+    /// - Parameter config: Validation configuration (defaults to .default if not specified)
+    public init(config: PatternValidatorConfig = .default) {
+        self.config = config
+        logger.info("Pattern Validator initialized with fabric widths: \(config.fabricWidths)")
     }
     
     // MARK: - Public Validation Methods
@@ -252,18 +281,18 @@ public final class PatternValidator: PatternValidationService {
             let edgeLength = distance(startPoint, endPoint)
             
             // Check if seam allowance is within acceptable range
-            if edgeLength < Self.minimumSeamAllowance {
+            if edgeLength < config.minimumSeamAllowance {
                 issues.append(ValidationIssue(
                     severity: .error,
                     type: .seamAllowanceError,
-                    message: "Seam allowance too narrow: \(String(format: "%.1f", edgeLength))mm < \(Self.minimumSeamAllowance)mm minimum",
+                    message: "Seam allowance too narrow: \(String(format: "%.1f", edgeLength))mm < \(config.minimumSeamAllowance)mm minimum",
                     panelId: panel.id,
                     location: CGPoint(x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2)
                 ))
-            } else if edgeLength > Self.maximumSeamAllowance {
+            } else if edgeLength > config.maximumSeamAllowance {
                 warnings.append(ValidationWarning(
                     type: .seamAllowanceWarning,
-                    message: "Seam allowance unusually wide: \(String(format: "%.1f", edgeLength))mm > \(Self.maximumSeamAllowance)mm recommended maximum",
+                    message: "Seam allowance unusually wide: \(String(format: "%.1f", edgeLength))mm > \(config.maximumSeamAllowance)mm recommended maximum",
                     panelId: panel.id,
                     location: CGPoint(x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2)
                 ))
@@ -492,20 +521,20 @@ public final class PatternValidator: PatternValidationService {
     private func validateFabricCompatibility(_ panels: [FlattenedPanelDTO]) -> FabricCompatibilityResult {
         var compatibleWidths: [Double] = []
         var issues: [String] = []
-        
+
         // Check which fabric widths can accommodate all panels
-        for width in Self.standardFabricWidths {
+        for width in config.fabricWidths {
             let oversizedPanels = panels.filter { panel in
                 panel.boundingBox.width > width
             }
-            
+
             if oversizedPanels.isEmpty {
                 compatibleWidths.append(width)
             } else {
                 issues.append("Fabric width \(Int(width))mm cannot accommodate \(oversizedPanels.count) panels")
             }
         }
-        
+
         return FabricCompatibilityResult(
             compatibleWidths: compatibleWidths,
             recommendedWidth: compatibleWidths.min(),
