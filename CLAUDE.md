@@ -43,6 +43,19 @@ CoverCraft/
 │   ├── Sources/
 │   │   ├── CoverCraftCore/        # Core services & DI
 │   │   ├── CoverCraftAR/          # AR scanning services
+│   │   │   └── ARScanViewController.swift  # LiDAR + depth limiting
+│   │   ├── CoverCraftDTO/         # Data transfer objects
+│   │   │   ├── MeshDTO.swift               # Mesh data + processing algorithms
+│   │   │   ├── MeshProcessingOptions.swift # Processing configuration
+│   │   │   └── CalibrationDTO.swift        # Calibration data
+│   │   ├── CoverCraftUI/          # SwiftUI views
+│   │   │   └── Views/
+│   │   │       ├── CalibrationView.swift   # Scale calibration UI
+│   │   │       └── MeshProcessingView.swift # Mesh cleanup UI
+│   │   ├── CoverCraftFeature/     # Main app feature
+│   │   │   ├── ContentView.swift  # Main navigation
+│   │   │   └── AppState.swift     # Central state
+│   │   ├── CoverCraftSegmentation/ # Mesh segmentation
 │   │   ├── CoverCraftFlattening/  # Mesh to pattern conversion
 │   │   └── CoverCraftExport/      # Pattern export services
 │   └── Tests/
@@ -156,6 +169,122 @@ camera images if the delegate keeps holding on to too many ARFrames.
 - Re-fetch anchors from `session.currentFrame` inside the dispatch block
 - Extract primitive statistics (counts) before dispatching
 - See `ARScanViewController.swift:303-366` for detailed comments
+
+---
+
+## Mesh Processing Pipeline (NEW)
+
+### Overview
+After scanning, users can optionally clean up their mesh before pattern generation. Processing is applied in this order (optimized for efficiency):
+
+1. **Connected Component Isolation** (first - reduces work for subsequent steps)
+2. **Plane-Based Cropping** (removes floor/ceiling)
+3. **Hole Filling** (closes small gaps)
+
+### Key Files
+- `MeshDTO.swift` - Contains all processing algorithms
+- `MeshProcessingOptions.swift` - Configuration DTO
+- `MeshProcessingView.swift` - Settings UI
+- `AppState.swift` - Has `processedMesh` and `effectiveMesh`
+
+### Processing Features
+
+#### 1. Depth Limiting (During Scan)
+Filters mesh vertices by distance from camera at scan completion.
+- **UI**: Slider in AR scan view (0.3m - 5m range)
+- **Default**: 2.0m
+- **Algorithm**: Squared distance comparison for performance
+- **Location**: `ARScanViewController.buildFinalMesh()`
+
+```swift
+let maxDepthSquared = maxDepth * maxDepth
+let delta = worldPos - cameraPosition
+let distanceSquared = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z
+if distanceSquared <= maxDepthSquared { /* keep vertex */ }
+```
+
+#### 2. Boundary/Hole Detection
+Detects open edges and chains them into boundary loops.
+- **Edge Detection**: Edges with only 1 adjacent triangle are boundary edges
+- **Loop Chaining**: BFS to connect boundary edges into closed loops
+- **UI**: Shows hole count in main view after scanning
+
+```swift
+let boundaryInfo = mesh.analyzeBoundaries()
+// boundaryInfo.holeCount, .isWatertight, .boundaryEdges, .boundaryLoops
+```
+
+#### 3. Hole Filling (Centroid Fan)
+Automatically closes small holes using fan triangulation.
+- **Toggle**: Enable/disable
+- **Slider**: Max hole size (3-50 edges)
+- **Algorithm**: Compute centroid → add as vertex → create fan triangles
+
+#### 4. Plane-Based Cropping
+Removes geometry below/above a horizontal cutting plane.
+- **Toggle**: Enable/disable
+- **Direction**: Below (floor) or Above (ceiling)
+- **Slider**: Cut height (0-50% from mesh bottom)
+- **Decision**: Based on triangle centroid Y position
+
+#### 5. Connected Component Isolation
+Keeps largest component, removes floating fragments.
+- **Toggle**: Enable/disable
+- **Slider**: Min fragment size (10-500 triangles)
+- **Algorithm**: BFS via shared edges to find components
+
+### Architecture Pattern: Effective Mesh
+
+```swift
+// AppState.swift
+public var currentMesh: MeshDTO?      // Raw scan
+public var processedMesh: MeshDTO?    // After cleanup (optional)
+public var effectiveMesh: MeshDTO? {  // Used by all downstream
+    processedMesh ?? currentMesh
+}
+```
+
+All downstream features (calibration, segmentation, generation) use `effectiveMesh` so they automatically get the processed version if available.
+
+### Vertex Remapping Pattern
+When filtering triangles, indices must be remapped:
+
+```swift
+// 1. Collect used vertices from kept triangles
+var usedVertices = Set<Int>()
+// 2. Create old→new index mapping
+var oldToNew: [Int: Int] = [:]
+// 3. Build new vertex array (only used vertices)
+// 4. Build new index array with remapped values
+```
+
+---
+
+## Calibration System (UPDATED)
+
+### CalibrationView
+Users can calibrate real-world scale using 5 methods:
+
+| Method | Description |
+|--------|-------------|
+| **Bounding Box Diagonal** | Corner to corner (longest possible) |
+| **X-Axis (Width)** | Left to right extent |
+| **Y-Axis (Height)** | Bottom to top extent |
+| **Z-Axis (Depth)** | Front to back extent |
+| **Longest Axis** | Auto-picks longest dimension |
+
+### Flow
+1. User selects calibration method
+2. UI shows computed mesh distance for that method
+3. User enters real-world measurement in meters
+4. "Apply Calibration" computes scale factor
+5. `CalibrationDTO.isComplete` becomes true
+6. Pattern generation uses scaled mesh
+
+### Key Files
+- `CalibrationView.swift` - Method selection UI
+- `CalibrationDTO.swift` - Immutable calibration data
+- `AppState.calibrationData` - Current calibration state
 
 ---
 
