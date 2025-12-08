@@ -16,7 +16,7 @@ let package = Package(
     ],
     dependencies: [
         // Testing dependencies
-        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.17.4"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.18.7"),
         // Logging infrastructure
         .package(url: "https://github.com/apple/swift-log", exact: "1.6.1"),
         // Metrics infrastructure  
