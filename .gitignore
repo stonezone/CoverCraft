@@ -262,6 +262,17 @@ jetson/*.log
 icon.png
 icon2.jpg
 
+# Local artifacts / reports (not required to run)
+swiftlint_report.json
+project summary.txt
+test_lscm
+PHASE_*_REPORT*.md
+QUALITY_METRICS_REPORT*.md
+covercraft-prompt.md
+covercraft-visualization-instructions.md
+HANDOFF_POLYCAM_CAPTURE.md
+DEPENDENCIES.md
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Markdown Files (selective tracking)
 # ─────────────────────────────────────────────────────────────────────────────
