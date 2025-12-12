@@ -1,6 +1,4 @@
 import SwiftUI
-
-import SwiftUI
 import CoverCraftDTO
 import CoverCraftCore
 import CoverCraftSegmentation
@@ -8,6 +6,8 @@ import CoverCraftSegmentation
 @available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct SegmentationPreview: View {
+    @Environment(\.dependencyContainer) private var container
+
     let mesh: Mesh?
     let resolution: SegmentationResolution
     @Binding var panels: [Panel]?
@@ -165,28 +165,34 @@ public struct SegmentationPreview: View {
     }
     
     private func generatePreview() {
-        guard mesh != nil else { return }
+        guard let meshToSegment = mesh else {
+            errorMessage = "No mesh available for segmentation"
+            return
+        }
+
+        guard let segmenter = container.resolve(MeshSegmentationService.self) else {
+            errorMessage = "Segmentation service not available"
+            return
+        }
         
         isSegmenting = true
         errorMessage = nil
         
+        let targetPanelCount = resolution.targetPanelCount
         Task {
             do {
-                let segmenter = DefaultMeshSegmentationService()
-                let generatedPanels = try await segmenter.segmentMesh(
-                    mesh!,
-                    targetPanelCount: resolution.targetPanelCount
-                )
+                let generatedPanels = try await Task.detached {
+                    try await segmenter.segmentMesh(
+                        meshToSegment,
+                        targetPanelCount: targetPanelCount
+                    )
+                }.value
                 
-                await MainActor.run {
-                    panels = generatedPanels
-                    isSegmenting = false
-                }
+                panels = generatedPanels
+                isSegmenting = false
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isSegmenting = false
-                }
+                errorMessage = error.localizedDescription
+                isSegmenting = false
             }
         }
     }

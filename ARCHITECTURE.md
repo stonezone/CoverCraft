@@ -147,7 +147,7 @@ enum SegmentationError: CoverCraftError {
 - **Large Data**: Streaming processing for mesh data
 
 ### Monitoring
-- **Metrics**: Swift Metrics for performance tracking
+- **Metrics**: MetricsService for performance tracking
 - **Logging**: Structured logging with swift-log
 - **Telemetry**: MetricsService for business metrics
 

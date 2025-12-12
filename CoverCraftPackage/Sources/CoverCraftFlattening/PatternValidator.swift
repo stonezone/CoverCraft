@@ -117,8 +117,11 @@ public final class PatternValidator: PatternValidationService {
         let distortionWarnings = validateDistortion(panel)
         warnings.append(contentsOf: distortionWarnings)
         
+        let hasBlockingIssues = issues.contains { issue in
+            issue.severity == .critical || issue.severity == .error
+        }
         let result = PatternValidationResult(
-            isValid: issues.isEmpty,
+            isValid: !hasBlockingIssues,
             issues: issues,
             warnings: warnings,
             panelId: panel.id,
@@ -160,8 +163,11 @@ public final class PatternValidator: PatternValidationService {
         let allIssues = panelResults.flatMap { $0.issues } + layoutIssues
         let allWarnings = panelResults.flatMap { $0.warnings }
         
+        let hasBlockingIssues = allIssues.contains { issue in
+            issue.severity == .critical || issue.severity == .error
+        }
         let result = PatternSetValidationResult(
-            isValid: allIssues.isEmpty,
+            isValid: !hasBlockingIssues,
             panelResults: panelResults,
             layoutIssues: layoutIssues,
             fabricCompatibility: fabricCompatibility,
@@ -272,29 +278,33 @@ public final class PatternValidator: PatternValidationService {
         let seamEdges = panel.edges.filter { $0.type == .seamAllowance }
         
         for edge in seamEdges {
-            guard edge.startIndex < panel.points2D.count && edge.endIndex < panel.points2D.count else {
+            // Seam allowance "width" is not inferable from two boundary points.
+            // We use `original3DLength` as the seam allowance width in millimeters for `.seamAllowance` edges.
+            guard let seamWidth = edge.original3DLength else {
+                warnings.append(ValidationWarning(
+                    type: .seamAllowanceWarning,
+                    message: "Seam allowance width missing for seam edge; skipping validation",
+                    panelId: panel.id,
+                    location: nil
+                ))
                 continue
             }
             
-            let startPoint = panel.points2D[edge.startIndex]
-            let endPoint = panel.points2D[edge.endIndex]
-            let edgeLength = distance(startPoint, endPoint)
-            
             // Check if seam allowance is within acceptable range
-            if edgeLength < config.minimumSeamAllowance {
+            if seamWidth < config.minimumSeamAllowance {
                 issues.append(ValidationIssue(
                     severity: .error,
                     type: .seamAllowanceError,
-                    message: "Seam allowance too narrow: \(String(format: "%.1f", edgeLength))mm < \(config.minimumSeamAllowance)mm minimum",
+                    message: "Seam allowance too narrow: \(String(format: "%.1f", seamWidth))mm < \(config.minimumSeamAllowance)mm minimum",
                     panelId: panel.id,
-                    location: CGPoint(x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2)
+                    location: nil
                 ))
-            } else if edgeLength > config.maximumSeamAllowance {
+            } else if seamWidth > config.maximumSeamAllowance {
                 warnings.append(ValidationWarning(
                     type: .seamAllowanceWarning,
-                    message: "Seam allowance unusually wide: \(String(format: "%.1f", edgeLength))mm > \(config.maximumSeamAllowance)mm recommended maximum",
+                    message: "Seam allowance unusually wide: \(String(format: "%.1f", seamWidth))mm > \(config.maximumSeamAllowance)mm recommended maximum",
                     panelId: panel.id,
-                    location: CGPoint(x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2)
+                    location: nil
                 ))
             }
         }
@@ -302,10 +312,7 @@ public final class PatternValidator: PatternValidationService {
         // Check for consistent seam allowance widths
         if seamEdges.count > 1 {
             let seamWidths = seamEdges.compactMap { edge -> Double? in
-                guard edge.startIndex < panel.points2D.count && edge.endIndex < panel.points2D.count else { return nil }
-                let startPoint = panel.points2D[edge.startIndex]
-                let endPoint = panel.points2D[edge.endIndex]
-                return distance(startPoint, endPoint)
+                edge.original3DLength
             }
             
             let avgWidth = seamWidths.reduce(0, +) / Double(seamWidths.count)
@@ -389,9 +396,9 @@ public final class PatternValidator: PatternValidationService {
             }
             
             // Validate 3D length preservation if available
-            if let original3DLength = edge.original3DLength {
+            if edge.type == .cutLine, let original3DLength = edge.original3DLength {
                 let lengthRatio = edgeLength / original3DLength
-                if lengthRatio < 0.5 || lengthRatio > 2.0 {
+                if lengthRatio <= 0.5 || lengthRatio >= 2.0 {
                     issues.append(ValidationIssue(
                         severity: .warning,
                         type: .distortionError,
@@ -418,8 +425,13 @@ public final class PatternValidator: PatternValidationService {
                 let edge1 = cutEdges[i]
                 let edge2 = cutEdges[j]
                 
-                // Skip adjacent edges
-                if edge1.endIndex == edge2.startIndex || edge1.startIndex == edge2.endIndex {
+                // Skip edges that share endpoints (adjacent edges).
+                let sharesEndpoint =
+                    edge1.startIndex == edge2.startIndex ||
+                    edge1.startIndex == edge2.endIndex ||
+                    edge1.endIndex == edge2.startIndex ||
+                    edge1.endIndex == edge2.endIndex
+                if sharesEndpoint {
                     continue
                 }
                 
@@ -503,7 +515,7 @@ public final class PatternValidator: PatternValidationService {
                     if await polygonsIntersect(panel1.points2D, panel2.points2D) {
                         let overlap = panel1.boundingBox.intersection(panel2.boundingBox)
                         issues.append(ValidationIssue(
-                            severity: .critical,
+                            severity: .error,
                             type: .intersectionError,
                             message: "Panels overlap - this will cause cutting conflicts",
                             panelId: panel1.id,
@@ -521,6 +533,7 @@ public final class PatternValidator: PatternValidationService {
     private func validateFabricCompatibility(_ panels: [FlattenedPanelDTO]) -> FabricCompatibilityResult {
         var compatibleWidths: [Double] = []
         var issues: [String] = []
+        let maxPanelWidth = panels.map { $0.boundingBox.width }.max() ?? 0
 
         // Check which fabric widths can accommodate all panels
         for width in config.fabricWidths {
@@ -535,9 +548,19 @@ public final class PatternValidator: PatternValidationService {
             }
         }
 
+        let recommendedWidth: Double?
+        if let smallestCompatible = compatibleWidths.min() {
+            recommendedWidth = smallestCompatible
+        } else if maxPanelWidth > 0 {
+            recommendedWidth = maxPanelWidth
+            issues.append("No standard fabric width can accommodate the widest panel (\(Int(maxPanelWidth))mm); custom width required")
+        } else {
+            recommendedWidth = nil
+        }
+
         return FabricCompatibilityResult(
             compatibleWidths: compatibleWidths,
-            recommendedWidth: compatibleWidths.min(),
+            recommendedWidth: recommendedWidth,
             issues: issues,
             requiresCustomWidth: compatibleWidths.isEmpty
         )
@@ -574,33 +597,18 @@ public final class PatternValidator: PatternValidationService {
     
     /// Estimate required fabric length using simple bin packing
     private func estimateRequiredFabricLength(_ panels: [FlattenedPanelDTO], fabricWidth: Double) -> Double {
-        // Sort panels by height (tallest first) for better packing
-        let sortedPanels = panels.sorted { $0.boundingBox.height > $1.boundingBox.height }
-        
-        var currentY: Double = 0
-        var currentRowHeight: Double = 0
-        var currentRowWidth: Double = 0
-        
-        for panel in sortedPanels {
-            let bbox = panel.boundingBox
-            
-            // If panel doesn't fit in current row, start new row
-            if currentRowWidth + bbox.width > fabricWidth {
-                currentY += currentRowHeight
-                currentRowHeight = bbox.height
-                currentRowWidth = bbox.width
-            } else {
-                // Panel fits in current row
-                currentRowWidth += bbox.width
-                currentRowHeight = max(currentRowHeight, bbox.height)
-            }
-        }
-        
-        // Add final row height
-        currentY += currentRowHeight
-        
+        guard fabricWidth > 0 else { return 0 }
+
+        // Heuristic lower-bound: assume near-perfect packing by area, but cannot be smaller than
+        // the tallest panel.
+        let totalArea = panels.reduce(0) { $0 + $1.area }
+        let minimumLengthByArea = totalArea / fabricWidth
+        let minimumLengthByHeight = panels.map { $0.boundingBox.height }.max() ?? 0
+
+        let estimatedLength = max(minimumLengthByArea, minimumLengthByHeight)
+
         // Add 10% padding for handling
-        return currentY * 1.1
+        return estimatedLength * 1.1
     }
     
     /// Generate fabric utilization recommendations
@@ -656,23 +664,28 @@ public final class PatternValidator: PatternValidationService {
     
     /// Find intersection point of two line segments
     private func lineIntersection(_ p1: CGPoint, _ p2: CGPoint, _ p3: CGPoint, _ p4: CGPoint) -> CGPoint? {
-        let d1 = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x)
-        let d2 = (p1.x - p3.x) * (p4.y - p3.y) - (p1.y - p3.y) * (p4.x - p3.x)
-        let d3 = (p1.x - p3.x) * (p2.y - p1.y) - (p1.y - p3.y) * (p2.x - p1.x)
-        
-        guard abs(d1) > 1e-8 else { return nil } // Lines are parallel
-        
-        let t1 = d2 / d1
-        let t2 = d3 / d1
-        
-        // Check if intersection is within both line segments
-        if t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1 {
-            return CGPoint(
-                x: p1.x + t1 * (p2.x - p1.x),
-                y: p1.y + t1 * (p2.y - p1.y)
-            )
+        // Segment intersection using parametric form:
+        // p = p1 + t * r, q = p3 + u * s
+        // Intersection exists when p == q with t,u in [0,1].
+        let r = CGPoint(x: p2.x - p1.x, y: p2.y - p1.y)
+        let s = CGPoint(x: p4.x - p3.x, y: p4.y - p3.y)
+        let qp = CGPoint(x: p3.x - p1.x, y: p3.y - p1.y)
+
+        let rxs = (r.x * s.y) - (r.y * s.x)
+        let qpxr = (qp.x * r.y) - (qp.y * r.x)
+
+        // Parallel or collinear segments.
+        if abs(rxs) < 1e-8 {
+            return nil
         }
-        
+
+        let t = ((qp.x * s.y) - (qp.y * s.x)) / rxs
+        let u = qpxr / rxs
+
+        if t >= 0, t <= 1, u >= 0, u <= 1 {
+            return CGPoint(x: p1.x + t * r.x, y: p1.y + t * r.y)
+        }
+
         return nil
     }
     

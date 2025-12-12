@@ -18,21 +18,20 @@
 - Purpose: 3D rendering and spatial computing support
 
 ### swift-log
-- Version: 1.5.3
+- Version: 1.6.1
 - License: Apache License 2.0
 - Repository: https://github.com/apple/swift-log
 - Purpose: Structured logging infrastructure
 
-### swift-metrics
-- Version: 2.4.1
-- License: Apache License 2.0
-- Repository: https://github.com/apple/swift-metrics
-- Purpose: Performance metrics and instrumentation
+### MetricsService (Internal)
+- Version: N/A
+- License: Project source
+- Purpose: Performance and business metrics tracking
 
 ## Development Dependencies
 
 ### swift-snapshot-testing
-- Version: 1.15.2
+- Version: 1.17.4
 - License: MIT
 - Repository: https://github.com/pointfreeco/swift-snapshot-testing
 - Purpose: UI and rendering snapshot testing
@@ -49,8 +48,7 @@
 | Swift              | 6.1.0        | 7.0.0       | Fully Compatible    |
 | ARKit              | 18.0         | 19.0        | Fully Compatible    |
 | RealityKit         | 18.0         | 19.0        | Fully Compatible    |
-| swift-log          | 1.5.3        | 2.0.0       | Fully Compatible    |
-| swift-metrics      | 2.4.1        | 3.0.0       | Fully Compatible    |
+| swift-log          | 1.6.1        | 2.0.0       | Fully Compatible    |
 
 ## Security Vulnerability Status
 

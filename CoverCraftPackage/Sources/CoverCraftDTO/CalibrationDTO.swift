@@ -24,6 +24,12 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
     
     /// Real-world distance between the two points (in meters)
     public let realWorldDistance: Double
+
+    /// Whether the real-world distance was explicitly set by the user/workflow
+    ///
+    /// The default `realWorldDistance` (1.0m) is a placeholder; a calibration is only considered complete
+    /// once a distance has been explicitly set.
+    public let isRealWorldDistanceSet: Bool
     
     /// Version of the calibration data format
     public let version: String
@@ -38,6 +44,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
     
     /// Whether the calibration is complete and valid
     public var isComplete: Bool {
+        guard isRealWorldDistanceSet else { return false }
         guard let first = firstPoint,
               let second = secondPoint else {
             return false
@@ -84,6 +91,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         firstPoint: SIMD3<Float>? = nil,
         secondPoint: SIMD3<Float>? = nil,
         realWorldDistance: Double = 1.0,
+        isRealWorldDistanceSet: Bool = true,
         id: UUID = UUID(),
         metadata: CalibrationMetadata? = nil,
         createdAt: Date = Date()
@@ -92,6 +100,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         self.firstPoint = firstPoint
         self.secondPoint = secondPoint
         self.realWorldDistance = max(0, realWorldDistance)
+        self.isRealWorldDistanceSet = isRealWorldDistanceSet
         self.version = "1.0.0"
         self.metadata = metadata
         self.createdAt = createdAt
@@ -102,7 +111,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
     /// Create an empty calibration
     /// - Returns: New empty calibration DTO
     public static func empty() -> CalibrationDTO {
-        CalibrationDTO()
+        CalibrationDTO(isRealWorldDistanceSet: false)
     }
     
     /// Create a calibration with both points set
@@ -119,7 +128,8 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         CalibrationDTO(
             firstPoint: firstPoint,
             secondPoint: secondPoint,
-            realWorldDistance: realWorldDistance
+            realWorldDistance: realWorldDistance,
+            isRealWorldDistanceSet: true
         )
     }
     
@@ -133,6 +143,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
             firstPoint: point,
             secondPoint: secondPoint,
             realWorldDistance: realWorldDistance,
+            isRealWorldDistanceSet: isRealWorldDistanceSet,
             id: id,
             metadata: metadata,
             createdAt: createdAt
@@ -147,6 +158,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
             firstPoint: firstPoint,
             secondPoint: point,
             realWorldDistance: realWorldDistance,
+            isRealWorldDistanceSet: isRealWorldDistanceSet,
             id: id,
             metadata: metadata,
             createdAt: createdAt
@@ -161,6 +173,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
             firstPoint: firstPoint,
             secondPoint: secondPoint,
             realWorldDistance: distance,
+            isRealWorldDistanceSet: true,
             id: id,
             metadata: metadata,
             createdAt: createdAt
@@ -180,6 +193,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         case firstPoint
         case secondPoint
         case realWorldDistance
+        case isRealWorldDistanceSet
         case version
         case createdAt
         case metadata
@@ -190,6 +204,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         
         self.id = try container.decode(UUID.self, forKey: .id)
         self.realWorldDistance = try container.decode(Double.self, forKey: .realWorldDistance)
+        self.isRealWorldDistanceSet = try container.decodeIfPresent(Bool.self, forKey: .isRealWorldDistanceSet) ?? true
         self.version = try container.decodeIfPresent(String.self, forKey: .version) ?? "1.0.0"
         self.createdAt = try container.decode(Date.self, forKey: .createdAt)
         self.metadata = try container.decodeIfPresent(CalibrationMetadata.self, forKey: .metadata)
@@ -229,6 +244,7 @@ public struct CalibrationDTO: Sendable, Codable, Equatable {
         
         try container.encode(id, forKey: .id)
         try container.encode(realWorldDistance, forKey: .realWorldDistance)
+        try container.encode(isRealWorldDistanceSet, forKey: .isRealWorldDistanceSet)
         try container.encode(version, forKey: .version)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(metadata, forKey: .metadata)

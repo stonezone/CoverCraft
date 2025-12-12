@@ -10,6 +10,7 @@ xcuserdata/
 *.xccheckout
 build/
 DerivedData/
+.derivedDataDevice/
 *.moved-aside
 *.pbxuser
 !default.pbxuser
@@ -293,7 +294,12 @@ icon2.jpg
 # ─────────────────────────────────────────────────────────────────────────────
 # Claude OS state files (don't commit these)
 # ─────────────────────────────────────────────────────────────────────────────
-.claude-os/claude-os-state.json
-.claude-os/.index_state
-.claude-os/.commit_count.claude-os/
+.claude-os/
 agent-os/
+
+# Local dev caches / scratch
+CoverCraftPackage/.clang-module-cache/
+CoverCraftPackage/.cache/
+CoverCraftPackage/.modulecache/
+CoverCraftPackage/.home/
+CoverCraftPackage/swift-test-output.txt

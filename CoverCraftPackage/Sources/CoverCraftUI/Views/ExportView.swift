@@ -9,7 +9,7 @@ public struct ExportView: View {
     
     let flattenedPanels: [FlattenedPanel]?
     
-    @State private var selectedFormat = ExportFormat.png
+    @State private var selectedFormat = ExportFormat.pdf
     @State private var isExporting = false
     @State private var exportMessage: String?
     @State private var isErrorMessage = false
@@ -76,7 +76,7 @@ public struct ExportView: View {
                     Text("Export Format:")
                         .font(.headline)
                     
-                    ForEach(ExportFormat.allCases, id: \.self) { format in
+                    ForEach(supportedFormats, id: \.self) { format in
                         HStack {
                             Button(action: { selectedFormat = format }) {
                                 HStack {
@@ -176,10 +176,21 @@ public struct ExportView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onAppear {
+            guard let service = exportService else { return }
+            let formats = service.getSupportedFormats()
+            if !formats.contains(selectedFormat), let first = formats.first {
+                selectedFormat = first
+            }
+        }
     }
     
     private var exportService: PatternExportService? {
         container.resolve(PatternExportService.self)
+    }
+
+    private var supportedFormats: [ExportFormat] {
+        exportService?.getSupportedFormats() ?? [.pdf, .svg, .png]
     }
     
     private func formatDescription(for format: ExportFormat) -> String {
@@ -210,27 +221,45 @@ public struct ExportView: View {
         isErrorMessage = false
         lastExportURL = nil
         
+        let selectedFormat = selectedFormat
+        let options = ExportOptions()
+
         Task {
             do {
-                let validation = service.validateForExport(panels, format: selectedFormat)
-                guard validation.isValid else {
-                    let message = validation.errors.joined(separator: "; ")
-                    exportMessage = message.isEmpty ? "Export validation failed" : message
+                enum ExportOutcome: Sendable {
+                    case success(message: String, url: URL)
+                    case failure(message: String)
+                }
+
+                let outcome = try await Task.detached {
+                    let validation = service.validateForExport(panels, format: selectedFormat)
+                    guard validation.isValid else {
+                        let message = validation.errors.joined(separator: "; ")
+                        return ExportOutcome.failure(message: message.isEmpty ? "Export validation failed" : message)
+                    }
+
+                    let result = try await service.exportPatterns(panels, format: selectedFormat, options: options)
+
+                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(result.filename)
+                    try result.data.write(to: tempURL, options: .atomic)
+
+                    return ExportOutcome.success(
+                        message: "Exported pattern to \(result.filename)",
+                        url: tempURL
+                    )
+                }.value
+
+                switch outcome {
+                case .success(let message, let url):
+                    exportMessage = message
+                    isErrorMessage = false
+                    lastExportURL = url
+                    isExporting = false
+                case .failure(let message):
+                    exportMessage = message
                     isErrorMessage = true
                     isExporting = false
-                    return
                 }
-                
-                let options = ExportOptions()
-                let result = try await service.exportPatterns(panels, format: selectedFormat, options: options)
-                
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(result.filename)
-                try result.data.write(to: tempURL, options: .atomic)
-                
-                exportMessage = "Exported pattern to \(result.filename)"
-                isErrorMessage = false
-                lastExportURL = tempURL
-                isExporting = false
             } catch {
                 exportMessage = "Export failed: \(error.localizedDescription)"
                 isErrorMessage = true

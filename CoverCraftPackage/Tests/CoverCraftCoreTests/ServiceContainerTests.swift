@@ -101,6 +101,22 @@ struct ServiceContainerTests {
         #expect(!container.isRegistered(TestService.self))
         #expect(!container.isRegistered(AnotherTestService.self))
     }
+
+    @Test("Nested resolution inside factory")
+    func nestedResolutionInsideFactory() {
+        let container = DefaultDependencyContainer()
+
+        container.register(Dependency(), for: Dependency.self)
+        container.registerFactory({
+            // This would deadlock with a non-recursive lock.
+            let dep = container.resolve(Dependency.self)
+            return FactoryProduct(dependency: dep)
+        }, for: FactoryProduct.self)
+
+        let resolved = container.resolve(FactoryProduct.self)
+        #expect(resolved != nil)
+        #expect(resolved?.dependency != nil)
+    }
 }
 
 // MARK: - Test Services
@@ -111,4 +127,13 @@ private final class TestService {
 
 private final class AnotherTestService {
     let id = UUID()
+}
+
+private final class Dependency {}
+
+private final class FactoryProduct {
+    let dependency: Dependency?
+    init(dependency: Dependency?) {
+        self.dependency = dependency
+    }
 }

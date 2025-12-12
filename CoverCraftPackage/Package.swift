@@ -18,9 +18,7 @@ let package = Package(
         // Testing dependencies
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.17.4"),
         // Logging infrastructure
-        .package(url: "https://github.com/apple/swift-log", exact: "1.6.1"),
-        // Metrics infrastructure  
-        .package(url: "https://github.com/apple/swift-metrics", exact: "2.5.0")
+        .package(url: "https://github.com/apple/swift-log", exact: "1.6.1")
     ],
     targets: [
         // DTO module - immutable data transfer objects (foundational, no dependencies)
@@ -34,8 +32,7 @@ let package = Package(
             name: "CoverCraftCore",
             dependencies: [
                 "CoverCraftDTO",  // Added for legacy type aliases
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "Metrics", package: "swift-metrics")
+                .product(name: "Logging", package: "swift-log")
             ]
         ),
         
@@ -45,6 +42,9 @@ let package = Package(
             dependencies: [
                 "CoverCraftCore",
                 "CoverCraftDTO"
+            ],
+            exclude: [
+                "PolycamStyleARScanning.swift.disabled"
             ]
         ),
         
@@ -113,7 +113,10 @@ let package = Package(
                 "CoverCraftExport",
                 "CoverCraftAR"
             ],
-            path: "Tests/TestUtilities"
+            path: "Tests/TestUtilities",
+            exclude: [
+                "TestUtilitiesValidation.swift.disabled"
+            ]
         ),
         
         // Test targets for each module
@@ -151,6 +154,10 @@ let package = Package(
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
+            exclude: [
+                "SegmentationServiceTests.swift.bak",
+                "MeshSegmentationTests.swift.bak"
+            ],
             resources: [.process("Fixtures")]
         ),
         .testTarget(
@@ -160,6 +167,9 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            exclude: [
+                "FlatteningServiceTests.swift.disabled"
             ],
             resources: [.process("Fixtures")]
         ),
@@ -189,6 +199,12 @@ let package = Package(
                 "CoverCraftFeature",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            exclude: [
+                "CoverCraftFeatureTests.swift.disabled",
+                "MeshSegmentationServiceTests.swift.disabled",
+                "PatternFlattenerTests.swift.disabled",
+                "PatternExporterTests.swift.disabled"
             ]
         ),
         
@@ -209,6 +225,9 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+            ],
+            exclude: [
+                "DTOContractTests.swift.disabled"
             ]
         ),
         .testTarget(
@@ -253,6 +272,9 @@ let package = Package(
                 "CoverCraftFlattening",
                 "CoverCraftExport",
                 "TestUtilities"
+            ],
+            exclude: [
+                "MemoryLeakTests.swift.disabled"
             ]
         )
     ]

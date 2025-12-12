@@ -1,4 +1,5 @@
 import SwiftUI
+import Logging
 import CoverCraftFeature
 import CoverCraftCore
 import CoverCraftAR
@@ -7,8 +8,13 @@ import CoverCraftFlattening
 import CoverCraftExport
 
 @main
+@MainActor
 struct CoverCraftApp: App {
     init() {
+        LoggingSystem.bootstrap { label in
+            StreamLogHandler.standardOutput(label: label)
+        }
+
         let container = DefaultDependencyContainer.shared
         container.registerCoreServices()
         container.registerARServices()

@@ -11,17 +11,6 @@ import Logging
 import CoverCraftCore
 import CoverCraftDTO
 
-/// Mesh data structure for AR scanned geometry
-public struct Mesh {
-    public let vertices: [SIMD3<Float>]
-    public let triangleIndices: [Int]
-    
-    public init(vertices: [SIMD3<Float>], triangleIndices: [Int]) {
-        self.vertices = vertices
-        self.triangleIndices = triangleIndices
-    }
-}
-
 /// View controller handling AR scanning with LiDAR - Polycam style
 public final class ARScanViewController: UIViewController {
 
@@ -42,7 +31,7 @@ public final class ARScanViewController: UIViewController {
     private var maxDepth: Float = 2.0
     private var lastCameraTransform: simd_float4x4?
 
-    public var onScanComplete: ((Mesh) -> Void)?
+    public var onScanComplete: ((MeshDTO) -> Void)?
 
     // Logger for AR scanning events
     private let logger = Logger(label: "com.covercraft.ar.scan")
@@ -266,7 +255,7 @@ public final class ARScanViewController: UIViewController {
         dismiss(animated: true, completion: nil)
     }
     
-    private func buildFinalMesh() -> Mesh {
+    private func buildFinalMesh() -> MeshDTO {
         // Get camera position for depth filtering
         let cameraPosition: SIMD3<Float>
         if let transform = lastCameraTransform {
@@ -354,7 +343,7 @@ public final class ARScanViewController: UIViewController {
         }
 
         logger.info("Depth filter: \(allVertices.count) vertices, \(allIndices.count / 3) triangles (max depth: \(maxDepth)m)")
-        return Mesh(vertices: allVertices, triangleIndices: allIndices)
+        return MeshDTO(vertices: allVertices, triangleIndices: allIndices)
     }
 }
 
@@ -532,16 +521,7 @@ public final class DefaultARScanViewControllerProvider: ARScanViewControllerProv
     @MainActor
     public func makeViewController(onScanComplete: @escaping @Sendable (MeshDTO) -> Void) -> UIViewController {
         let controller = ARScanViewController()
-        controller.onScanComplete = { mesh in
-            // Convert internal Mesh to MeshDTO
-            let meshDTO = MeshDTO(
-                vertices: mesh.vertices,
-                triangleIndices: mesh.triangleIndices,
-                id: UUID(),
-                createdAt: Date()
-            )
-            onScanComplete(meshDTO)
-        }
+        controller.onScanComplete = { meshDTO in onScanComplete(meshDTO) }
         return controller
     }
 }

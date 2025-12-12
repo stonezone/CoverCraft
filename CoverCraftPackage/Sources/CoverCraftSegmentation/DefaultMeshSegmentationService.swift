@@ -75,6 +75,7 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
     }
     
     public func segmentMesh(_ mesh: MeshDTO, targetPanelCount: Int) async throws -> [PanelDTO] {
+        try Task.checkCancellation()
         let startTime = CFAbsoluteTimeGetCurrent()
         logger.info("Starting enhanced K-means segmentation with \(targetPanelCount) target panels")
         
@@ -91,6 +92,8 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
             targetCount: targetPanelCount,
             startTime: startTime
         )
+
+        try Task.checkCancellation()
         
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         logger.info("Enhanced segmentation completed in \(String(format: "%.3f", duration))s with \(panels.count) panels")
@@ -202,6 +205,7 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
     }
     
     private func checkTimeout(startTime: Double) throws {
+        try Task.checkCancellation()
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
         if elapsed > Config.timeoutSeconds {
             throw SegmentationError.timeout
@@ -219,6 +223,7 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
         let vertexTriangles = buildVertexTriangleAdjacency(mesh: mesh)
         
         for vertexIndex in 0..<vertexCount {
+            try Task.checkCancellation()
             let position = mesh.vertices[vertexIndex]
             
             // Compute vertex normal (area-weighted average of adjacent triangle normals)
@@ -1050,12 +1055,13 @@ public extension DefaultDependencyContainer {
     
     /// Register segmentation services
     func registerSegmentationServices() {
-        print("Registering K-means mesh segmentation services")
+        let logger = Logger(label: "com.covercraft.segmentation.registration")
+        logger.info("Registering segmentation services")
         
         registerSingleton({
             DefaultMeshSegmentationService()
         }, for: MeshSegmentationService.self)
         
-        print("K-means segmentation services registration completed")
+        logger.info("Segmentation services registration completed")
     }
 }

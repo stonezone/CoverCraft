@@ -511,9 +511,9 @@ struct PatternValidationTests {
         // Create a bowtie shape (self-intersecting)
         let points = [
             CGPoint(x: 0, y: 0),
-            CGPoint(x: 50, y: 50),
-            CGPoint(x: 100, y: 0),
-            CGPoint(x: 50, y: -50)
+            CGPoint(x: 100, y: 100),
+            CGPoint(x: 0, y: 100),
+            CGPoint(x: 100, y: 0)
         ]
         
         let edges = [
@@ -549,12 +549,12 @@ struct PatternValidationTests {
     private func createRealisticChairCushionPanels() -> [FlattenedPanelDTO] {
         return [
             // Top panel (square cushion)
-            createPanelWithDimensions(width: 400, height: 400),
+            createPanelAtPosition(x: 0, y: 0, width: 400, height: 400),
             // Side panels (rectangular)
-            createPanelWithDimensions(width: 400, height: 60),
-            createPanelWithDimensions(width: 400, height: 60),
-            createPanelWithDimensions(width: 400, height: 60),
-            createPanelWithDimensions(width: 400, height: 60)
+            createPanelAtPosition(x: 0, y: 420, width: 400, height: 60),
+            createPanelAtPosition(x: 0, y: 490, width: 400, height: 60),
+            createPanelAtPosition(x: 0, y: 560, width: 400, height: 60),
+            createPanelAtPosition(x: 0, y: 630, width: 400, height: 60)
         ]
     }
     

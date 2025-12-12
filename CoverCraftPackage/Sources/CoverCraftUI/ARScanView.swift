@@ -32,8 +32,10 @@ public struct ARScanView: UIViewControllerRepresentable {
             )
         }
         return provider.makeViewController { meshDTO in
-            scannedMesh = meshDTO
-            dismiss()
+            Task { @MainActor in
+                scannedMesh = meshDTO
+                dismiss()
+            }
         }
     }
 

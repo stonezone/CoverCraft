@@ -78,7 +78,11 @@ public final class DefaultPatternExportService: PatternExportService {
     }
     
     public func getSupportedFormats() -> [ExportFormat] {
-        return [.pdf, .svg, .png, .gif]
+        #if canImport(UIKit)
+        return [.pdf, .svg, .png]
+        #else
+        return [.svg]
+        #endif
     }
     
     public func validateForExport(_ panels: [FlattenedPanelDTO], format: ExportFormat) -> ExportValidationResult {
@@ -108,6 +112,12 @@ public final class DefaultPatternExportService: PatternExportService {
         switch format {
         case .dxf:
             errors.append("DXF format not yet implemented")
+        case .gif:
+            errors.append("GIF format not supported")
+        case .pdf, .png:
+            #if !canImport(UIKit)
+            errors.append("\(format.rawValue) export requires iOS/iPadOS")
+            #endif
         default:
             break
         }
@@ -128,7 +138,7 @@ public final class DefaultPatternExportService: PatternExportService {
         case .png:
             return try await generatePNG(panels: panels, options: options)
         case .gif:
-            return try await generateGIF(panels: panels, options: options)
+            throw ExportError.unsupportedFeature("GIF export not supported")
         case .dxf:
             throw ExportError.unsupportedFeature("DXF export not yet implemented")
         }
@@ -153,30 +163,87 @@ public final class DefaultPatternExportService: PatternExportService {
     }
     
     private func generateSVG(panels: [FlattenedPanelDTO], options: ExportOptions) async throws -> Data {
+        let bounds = calculateOverallBounds(panels: panels)
+        let seamPaddingMm = options.includeSeamAllowance ? options.seamAllowanceWidth : 0
+        let marginMm: CGFloat = 20
+        let paddedBounds = bounds.insetBy(dx: -(CGFloat(seamPaddingMm) + marginMm), dy: -(CGFloat(seamPaddingMm) + marginMm))
+
+        let widthMm = max(1, paddedBounds.width)
+        let heightMm = max(1, paddedBounds.height)
+
+        func f(_ value: CGFloat) -> String { String(format: "%.2f", value) }
+
         var svg = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
-        <title>CoverCraft Pattern Export</title>
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="\(f(widthMm))mm" height="\(f(heightMm))mm"
+             viewBox="\(f(paddedBounds.minX)) \(f(paddedBounds.minY)) \(f(paddedBounds.width)) \(f(paddedBounds.height))">
+          <title>CoverCraft Pattern Export</title>
+          <desc>Units: millimeters</desc>
+          <style>
+            .cut { fill: none; stroke: #000; stroke-width: 0.50; }
+            .seam { fill: none; stroke: #1e90ff; stroke-width: 0.35; stroke-dasharray: 4 3; }
+            .cal { fill: none; stroke: #000; stroke-width: 0.40; }
+            .label { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 6px; fill: #000; }
+          </style>
         
         """
-        
-        for (index, panel) in panels.enumerated() {
-            let pathData = generateSVGPath(for: panel)
-            let color = panel.color
-            
+
+        // Calibration bar (for projector/print scaling)
+        let maxReferenceMm = max(10, min(100, paddedBounds.width - 20))
+        let referenceMm = floor(maxReferenceMm / 10) * 10 // snap to 10mm increments
+        let legendX = paddedBounds.minX + 10
+        let legendY = paddedBounds.minY + 10
+
+        svg += """
+          <g id="calibration">
+            <line x1="\(f(legendX))" y1="\(f(legendY))" x2="\(f(legendX + referenceMm))" y2="\(f(legendY))" class="cal" />
+        """
+
+        let tickEveryMm: CGFloat = 10
+        let tickCount = Int(referenceMm / tickEveryMm)
+        for i in 0...tickCount {
+            let x = legendX + CGFloat(i) * tickEveryMm
+            let tickHeight: CGFloat = (i % 5 == 0) ? 4 : 2
             svg += """
-            <path d="\(pathData)" 
-                  fill="none" 
-                  stroke="rgb(\(Int(color.red * 255)),\(Int(color.green * 255)),\(Int(color.blue * 255)))" 
-                  stroke-width="1" 
-                  id="panel-\(index)" />
             
+            <line x1="\(f(x))" y1="\(f(legendY - tickHeight))" x2="\(f(x))" y2="\(f(legendY + tickHeight))" class="cal" />
             """
         }
+
+        svg += """
         
+            <text x="\(f(legendX))" y="\(f(legendY + 10))" class="label">\(Int(referenceMm))mm calibration bar</text>
+          </g>
+        
+        """
+
+        // Panels (cut lines + optional seam allowance)
+        for (index, panel) in panels.enumerated() {
+            let pathData = generateSVGPath(for: panel)
+            svg += """
+              <path d="\(pathData)" class="cut" id="panel-\(index)" />
+            
+            """
+
+            if options.includeSeamAllowance {
+                let seamPoints = computeSeamAllowanceOffsetPoints(points: panel.points2D, width: options.seamAllowanceWidth)
+                if seamPoints.count >= 3 {
+                    let seamPath = generateSVGPath(for: seamPoints)
+                    svg += """
+                      <path d="\(seamPath)" class="seam" id="panel-\(index)-seam" />
+                    
+                    """
+                }
+            }
+        }
+
         svg += "</svg>"
         
-        return svg.data(using: .utf8)!
+        guard let data = svg.data(using: .utf8) else {
+            throw ExportError.exportFailed("Could not encode SVG as UTF-8")
+        }
+        return data
     }
     
     private func generatePNG(panels: [FlattenedPanelDTO], options: ExportOptions) async throws -> Data {
@@ -203,10 +270,21 @@ public final class DefaultPatternExportService: PatternExportService {
             width: paperSize.width - 2 * margin,
             height: paperSize.height - 2 * margin
         )
-        
-        // Calculate overall bounds of all panels
-        let bounds = calculateOverallBounds(panels: panels)
-        let scaleFactor = calculateScaleFactor(bounds: bounds, contentRect: contentRect, options: options)
+
+        // Use real-world scaling in PDF: pattern coordinates are millimeters.
+        // Convert mm → PDF points at 72 DPI and tile across pages if needed.
+        let pointsPerMm: CGFloat = (72.0 / 25.4) * CGFloat(options.scale)
+
+        let patternBounds = calculateOverallBounds(panels: panels)
+        let seamPaddingMm: CGFloat = options.includeSeamAllowance ? CGFloat(options.seamAllowanceWidth) : 0
+        let paddedBounds = patternBounds.insetBy(dx: -seamPaddingMm, dy: -seamPaddingMm)
+
+        let contentWidthMm = contentRect.width / pointsPerMm
+        let contentHeightMm = contentRect.height / pointsPerMm
+
+        let pagesX = max(1, Int(ceil(paddedBounds.width / contentWidthMm)))
+        let pagesY = max(1, Int(ceil(paddedBounds.height / contentHeightMm)))
+        let totalPages = pagesX * pagesY
         
         let pdfData = NSMutableData()
         
@@ -216,44 +294,69 @@ public final class DefaultPatternExportService: PatternExportService {
             kCGPDFContextSubject: "Sewing Pattern Export",
             kCGPDFContextCreator: "CoverCraft iOS App v1.0.0"
         ])
-        
-        // Start first page
-        UIGraphicsBeginPDFPage()
-        
-        guard let context = UIGraphicsGetCurrentContext() else {
-            UIGraphicsEndPDFContext()
-            throw ExportError.exportFailed("Could not create PDF context")
+
+        var pageNumber = 0
+        for row in 0..<pagesY {
+            for col in 0..<pagesX {
+                pageNumber += 1
+                UIGraphicsBeginPDFPageWithInfo(pageRect, nil)
+
+                guard let context = UIGraphicsGetCurrentContext() else {
+                    UIGraphicsEndPDFContext()
+                    throw ExportError.exportFailed("Could not create PDF context")
+                }
+
+                await drawPDFHeader(
+                    context: context,
+                    rect: pageRect,
+                    options: options,
+                    panelCount: panels.count,
+                    pageNumber: pageNumber,
+                    totalPages: totalPages
+                )
+
+                await drawRulers(context: context, contentRect: contentRect, scaleFactor: pointsPerMm, options: options)
+
+                // Clip to content area then draw the tile in mm space.
+                context.saveGState()
+                context.addRect(contentRect)
+                context.clip()
+
+                // Set origin to bottom-left of contentRect in page coordinates (UIKit y-down).
+                context.translateBy(x: contentRect.minX, y: contentRect.maxY)
+                context.scaleBy(x: pointsPerMm, y: -pointsPerMm) // y-up, 1 unit = 1mm
+
+                let tileOriginX = paddedBounds.minX + CGFloat(col) * contentWidthMm
+                let tileOriginY = paddedBounds.minY + CGFloat(pagesY - 1 - row) * contentHeightMm
+                context.translateBy(x: -tileOriginX, y: -tileOriginY)
+
+                for (index, panel) in panels.enumerated() {
+                    await drawPanelInPDF(context: context, panel: panel, index: index, options: options)
+                }
+
+                context.restoreGState()
+
+                // Draw legend and cutting instructions on the first page only
+                if pageNumber == 1 {
+                    await drawPDFLegend(context: context, rect: pageRect, panels: panels, options: options)
+                }
+            }
         }
-        
-        // Draw title and metadata
-        await drawPDFHeader(context: context, rect: pageRect, options: options, panelCount: panels.count)
-        
-        // Draw rulers and scale reference
-        await drawRulers(context: context, contentRect: contentRect, scaleFactor: scaleFactor, options: options)
-        
-        // Transform coordinate system for pattern drawing
-        context.saveGState()
-        context.translateBy(x: contentRect.midX, y: contentRect.midY)
-        context.scaleBy(x: scaleFactor, y: -scaleFactor) // Flip Y-axis for standard coordinates
-        context.translateBy(x: -bounds.midX, y: -bounds.midY)
-        
-        // Draw each panel
-        for (index, panel) in panels.enumerated() {
-            await drawPanelInPDF(context: context, panel: panel, index: index, options: options)
-        }
-        
-        context.restoreGState()
-        
-        // Draw legend and cutting instructions
-        await drawPDFLegend(context: context, rect: pageRect, panels: panels, options: options)
-        
+
         UIGraphicsEndPDFContext()
         
         return pdfData as Data
     }
     
     @MainActor
-    private func drawPDFHeader(context: CGContext, rect: CGRect, options: ExportOptions, panelCount: Int) async {
+    private func drawPDFHeader(
+        context: CGContext,
+        rect: CGRect,
+        options: ExportOptions,
+        panelCount: Int,
+        pageNumber: Int,
+        totalPages: Int
+    ) async {
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.boldSystemFont(ofSize: 16),
             .foregroundColor: UIColor.black
@@ -265,21 +368,24 @@ public final class DefaultPatternExportService: PatternExportService {
         ]
         
         let title = "CoverCraft Sewing Pattern"
-        let subtitle = "Scale: \(String(format: "%.1f", options.scale)):1 • \(panelCount) panels • \(options.paperSize.rawValue)"
+        let scaleText = options.scale == 1.0
+            ? "Scale: 1:1"
+            : "Scale: x\(String(format: "%.2f", options.scale))"
+        let subtitle = "\(scaleText) • \(panelCount) panels • \(options.paperSize.rawValue) • Page \(pageNumber)/\(totalPages)"
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
         
         // Draw title
         let titleSize = title.size(withAttributes: titleAttributes)
-        let titleRect = CGRect(x: 36, y: rect.height - 36 - titleSize.height, width: titleSize.width, height: titleSize.height)
+        let titleRect = CGRect(x: 36, y: 8, width: titleSize.width, height: titleSize.height)
         title.draw(in: titleRect, withAttributes: titleAttributes)
         
         // Draw subtitle
-        let subtitleRect = CGRect(x: 36, y: titleRect.minY - 18, width: rect.width - 72, height: 16)
+        let subtitleRect = CGRect(x: 36, y: titleRect.maxY + 2, width: rect.width - 72, height: 16)
         subtitle.draw(in: subtitleRect, withAttributes: subtitleAttributes)
         
         // Draw timestamp in top right
         let timestampSize = timestamp.size(withAttributes: subtitleAttributes)
-        let timestampRect = CGRect(x: rect.width - 36 - timestampSize.width, y: rect.height - 36 - timestampSize.height, width: timestampSize.width, height: timestampSize.height)
+        let timestampRect = CGRect(x: rect.width - 36 - timestampSize.width, y: 8, width: timestampSize.width, height: timestampSize.height)
         timestamp.draw(in: timestampRect, withAttributes: subtitleAttributes)
     }
     
@@ -310,24 +416,28 @@ public final class DefaultPatternExportService: PatternExportService {
         
         context.strokePath()
         
-        // Draw scale reference
+        // Draw scale reference (in pattern units, scaled with the pattern)
         let scaleRefY = contentRect.minY - 20
-        let scaleRefLength: CGFloat = 72 // 1 inch
+        let referenceMm: CGFloat = 100
+        let scaleRefLength: CGFloat = referenceMm * scaleFactor
         
         context.move(to: CGPoint(x: contentRect.minX, y: scaleRefY))
         context.addLine(to: CGPoint(x: contentRect.minX + scaleRefLength, y: scaleRefY))
         
         // Add tick marks
-        for i in 0...4 {
-            let x = contentRect.minX + CGFloat(i) * scaleRefLength / 4
-            context.move(to: CGPoint(x: x, y: scaleRefY - 3))
-            context.addLine(to: CGPoint(x: x, y: scaleRefY + 3))
+        let tickEveryMm: CGFloat = 10
+        let tickCount = Int(referenceMm / tickEveryMm)
+        for i in 0...tickCount {
+            let x = contentRect.minX + CGFloat(i) * tickEveryMm * scaleFactor
+            let tickHeight: CGFloat = (i % 5 == 0) ? 6 : 3 // longer tick every 50mm
+            context.move(to: CGPoint(x: x, y: scaleRefY - tickHeight))
+            context.addLine(to: CGPoint(x: x, y: scaleRefY + tickHeight))
         }
         
         context.strokePath()
         
         // Scale label
-        let scaleLabel = "1 inch reference"
+        let scaleLabel = "\(Int(referenceMm))mm calibration bar"
         let labelAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 8),
             .foregroundColor: UIColor.black
@@ -463,10 +573,19 @@ public final class DefaultPatternExportService: PatternExportService {
             width: imageSize.width - 2 * marginPixels,
             height: imageSize.height - 2 * marginPixels
         )
-        
-        // Calculate overall bounds of all panels
+
+        // Use real-world scaling in PNG: pattern coordinates are millimeters.
+        // This renders at 1:1 for panels that fit on the chosen paper size.
+        let pixelsPerMm: CGFloat = (dpi / 25.4) * CGFloat(options.scale)
+
         let bounds = calculateOverallBounds(panels: panels)
-        let scaleFactor = calculateScaleFactor(bounds: bounds, contentRect: contentRect, options: options)
+        let seamPaddingMm: CGFloat = options.includeSeamAllowance ? CGFloat(options.seamAllowanceWidth) : 0
+        let paddedBounds = bounds.insetBy(dx: -seamPaddingMm, dy: -seamPaddingMm)
+
+        let contentWidthMm = contentRect.width / pixelsPerMm
+        let contentHeightMm = contentRect.height / pixelsPerMm
+        let offsetMmX = max(0, (contentWidthMm - paddedBounds.width) / 2)
+        let offsetMmY = max(0, (contentHeightMm - paddedBounds.height) / 2)
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0 // DPI handled manually via imageSize
@@ -488,13 +607,19 @@ public final class DefaultPatternExportService: PatternExportService {
             drawPNGHeader(context: context, size: imageSize, options: options, panelCount: panels.count, dpi: dpi)
             
             // Draw grid overlay if requested
-            drawGrid(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
+            drawGrid(context: context, contentRect: contentRect, scaleFactor: pixelsPerMm, dpi: dpi)
             
             // Transform coordinate system for pattern drawing
             context.saveGState()
-            context.translateBy(x: contentRect.midX, y: contentRect.midY)
-            context.scaleBy(x: scaleFactor, y: -scaleFactor) // Flip Y-axis for standard coordinates
-            context.translateBy(x: -bounds.midX, y: -bounds.midY)
+            context.addRect(contentRect)
+            context.clip()
+
+            context.translateBy(x: contentRect.minX, y: contentRect.maxY)
+            context.scaleBy(x: pixelsPerMm, y: -pixelsPerMm) // y-up, 1 unit = 1mm
+            context.translateBy(
+                x: offsetMmX - paddedBounds.minX,
+                y: offsetMmY - paddedBounds.minY
+            )
             
             // Draw each panel with anti-aliasing
             for (index, panel) in panels.enumerated() {
@@ -505,7 +630,7 @@ public final class DefaultPatternExportService: PatternExportService {
             
             // Draw rulers and measurements
             if options.includeRegistrationMarks {
-                drawPNGRulers(context: context, contentRect: contentRect, scaleFactor: scaleFactor, dpi: dpi)
+                drawPNGRulers(context: context, contentRect: contentRect, scaleFactor: pixelsPerMm, dpi: dpi)
             }
         }
         
@@ -521,6 +646,7 @@ public final class DefaultPatternExportService: PatternExportService {
         let fontSize: CGFloat = 16 * scaleFactor
         let smallFontSize: CGFloat = 12 * scaleFactor
         let margin: CGFloat = 36 * scaleFactor
+        let topInset: CGFloat = 8 * scaleFactor
         
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.boldSystemFont(ofSize: fontSize),
@@ -533,21 +659,24 @@ public final class DefaultPatternExportService: PatternExportService {
         ]
         
         let title = "CoverCraft Sewing Pattern"
-        let subtitle = "Scale: \(String(format: "%.1f", options.scale)):1 • \(panelCount) panels • \(options.paperSize.rawValue) • 300 DPI"
+        let scaleText = options.scale == 1.0
+            ? "Scale: 1:1"
+            : "Scale: x\(String(format: "%.2f", options.scale))"
+        let subtitle = "\(scaleText) • \(panelCount) panels • \(options.paperSize.rawValue) • \(Int(dpi)) DPI"
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
         
         // Draw title
         let titleSize = title.size(withAttributes: titleAttributes)
-        let titleRect = CGRect(x: margin, y: size.height - margin - titleSize.height, width: titleSize.width, height: titleSize.height)
+        let titleRect = CGRect(x: margin, y: topInset, width: titleSize.width, height: titleSize.height)
         title.draw(in: titleRect, withAttributes: titleAttributes)
         
         // Draw subtitle
-        let subtitleRect = CGRect(x: margin, y: titleRect.minY - 18 * scaleFactor, width: size.width - 2 * margin, height: smallFontSize + 4)
+        let subtitleRect = CGRect(x: margin, y: titleRect.maxY + 2 * scaleFactor, width: size.width - 2 * margin, height: smallFontSize + 4)
         subtitle.draw(in: subtitleRect, withAttributes: subtitleAttributes)
         
         // Draw timestamp in top right
         let timestampSize = timestamp.size(withAttributes: subtitleAttributes)
-        let timestampRect = CGRect(x: size.width - margin - timestampSize.width, y: size.height - margin - timestampSize.height, width: timestampSize.width, height: timestampSize.height)
+        let timestampRect = CGRect(x: size.width - margin - timestampSize.width, y: topInset, width: timestampSize.width, height: timestampSize.height)
         timestamp.draw(in: timestampRect, withAttributes: subtitleAttributes)
     }
     
@@ -669,17 +798,20 @@ public final class DefaultPatternExportService: PatternExportService {
         
         context.strokePath()
         
-        // Draw scale reference at high resolution
+        // Draw scale reference (in pattern units, scaled with the pattern)
         let scaleRefY = contentRect.minY - 24 * dpi / 72
-        let scaleRefLength: CGFloat = 72 * dpi / 72 // 1 inch at high DPI
+        let referenceMm: CGFloat = 100
+        let scaleRefLength: CGFloat = referenceMm * scaleFactor
         
         context.move(to: CGPoint(x: contentRect.minX, y: scaleRefY))
         context.addLine(to: CGPoint(x: contentRect.minX + scaleRefLength, y: scaleRefY))
         
         // Add precise tick marks
-        for i in 0...8 {
-            let x = contentRect.minX + CGFloat(i) * scaleRefLength / 8
-            let tickHeight: CGFloat = (i % 4 == 0) ? 6 * dpi / 72 : 3 * dpi / 72
+        let tickEveryMm: CGFloat = 10
+        let tickCount = Int(referenceMm / tickEveryMm)
+        for i in 0...tickCount {
+            let x = contentRect.minX + CGFloat(i) * tickEveryMm * scaleFactor
+            let tickHeight: CGFloat = (i % 5 == 0) ? 6 * dpi / 72 : 3 * dpi / 72
             context.move(to: CGPoint(x: x, y: scaleRefY - tickHeight))
             context.addLine(to: CGPoint(x: x, y: scaleRefY + tickHeight))
         }
@@ -687,7 +819,7 @@ public final class DefaultPatternExportService: PatternExportService {
         context.strokePath()
         
         // Scale label at high resolution
-        let scaleLabel = "1 inch reference (300 DPI)"
+        let scaleLabel = "\(Int(referenceMm))mm calibration bar"
         let labelFontSize = 10 * dpi / 72
         let labelAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: labelFontSize),
@@ -708,14 +840,20 @@ public final class DefaultPatternExportService: PatternExportService {
     }
     
     private func generateSVGPath(for panel: FlattenedPanelDTO) -> String {
-        guard !panel.points2D.isEmpty else { return "" }
-        
-        var path = "M \(panel.points2D[0].x) \(panel.points2D[0].y)"
-        
-        for point in panel.points2D.dropFirst() {
-            path += " L \(point.x) \(point.y)"
+        generateSVGPath(for: panel.points2D)
+    }
+
+    private func generateSVGPath(for points: [CGPoint]) -> String {
+        guard !points.isEmpty else { return "" }
+
+        func f(_ value: CGFloat) -> String { String(format: "%.2f", value) }
+
+        var path = "M \(f(points[0].x)) \(f(points[0].y))"
+
+        for point in points.dropFirst() {
+            path += " L \(f(point.x)) \(f(point.y))"
         }
-        
+
         path += " Z"
         return path
     }
@@ -770,35 +908,35 @@ public final class DefaultPatternExportService: PatternExportService {
         return CGPoint(x: sumX / CGFloat(points.count), y: sumY / CGFloat(points.count))
     }
     
-    private func createSeamAllowancePath(points: [CGPoint], width: Double) -> CGMutablePath {
-        guard points.count >= 3 else { return CGMutablePath() }
-        
-        let path = CGMutablePath()
-        let seamWidth = CGFloat(width) / 10.0 // Convert mm to points (approximate)
-        
-        // Create offset path for seam allowance
+    private func computeSeamAllowanceOffsetPoints(points: [CGPoint], width: Double) -> [CGPoint] {
+        guard points.count >= 3 else { return [] }
+
+        // `points` are in millimeters. The caller's CGContext/SVG viewBox handles units.
+        let seamWidth = CGFloat(width)
+
         var offsetPoints: [CGPoint] = []
-        
+        offsetPoints.reserveCapacity(points.count)
+
         for i in 0..<points.count {
             let currentPoint = points[i]
             let nextPoint = points[(i + 1) % points.count]
             let prevPoint = points[(i - 1 + points.count) % points.count]
-            
+
             // Calculate perpendicular offset direction
             let v1 = CGPoint(x: currentPoint.x - prevPoint.x, y: currentPoint.y - prevPoint.y)
             let v2 = CGPoint(x: nextPoint.x - currentPoint.x, y: nextPoint.y - currentPoint.y)
-            
+
             // Normalize and average the directions
             let l1 = sqrt(v1.x * v1.x + v1.y * v1.y)
             let l2 = sqrt(v2.x * v2.x + v2.y * v2.y)
-            
+
             if l1 > 0 && l2 > 0 {
                 let n1 = CGPoint(x: -v1.y / l1, y: v1.x / l1) // Perpendicular to v1
                 let n2 = CGPoint(x: -v2.y / l2, y: v2.x / l2) // Perpendicular to v2
-                
+
                 let avgNormal = CGPoint(x: (n1.x + n2.x) / 2, y: (n1.y + n2.y) / 2)
                 let normalLength = sqrt(avgNormal.x * avgNormal.x + avgNormal.y * avgNormal.y)
-                
+
                 if normalLength > 0 {
                     let unitNormal = CGPoint(x: avgNormal.x / normalLength, y: avgNormal.y / normalLength)
                     let offsetPoint = CGPoint(
@@ -813,6 +951,15 @@ public final class DefaultPatternExportService: PatternExportService {
                 offsetPoints.append(currentPoint)
             }
         }
+
+        return offsetPoints
+    }
+
+    private func createSeamAllowancePath(points: [CGPoint], width: Double) -> CGMutablePath {
+        guard points.count >= 3 else { return CGMutablePath() }
+        
+        let path = CGMutablePath()
+        let offsetPoints = computeSeamAllowanceOffsetPoints(points: points, width: width)
         
         // Create the offset path
         if !offsetPoints.isEmpty {

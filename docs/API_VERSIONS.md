@@ -19,7 +19,6 @@ The CoverCraft application currently operates entirely offline with no external 
 | Package | Version | Purpose | Status | Documentation |
 |---------|---------|---------|--------|---------------|
 | swift-log | 1.6.1 | Structured logging framework | ✅ Active | [GitHub](https://github.com/apple/swift-log) |
-| swift-metrics | 2.5.0 | Metrics collection framework | ✅ Active | [GitHub](https://github.com/apple/swift-metrics) |
 | swift-snapshot-testing | 1.17.4 | Snapshot testing for UI/data | ✅ Active | [GitHub](https://github.com/pointfreeco/swift-snapshot-testing) |
 
 **Dependency Management Strategy:**
@@ -68,8 +67,8 @@ The CoverCraft application currently operates entirely offline with no external 
 
 | API | Minimum Version | Current Usage | Purpose | Status |
 |-----|----------------|---------------|---------|---------|
-| `os.Logger` | iOS 14.0+ | iOS 18.0+ | Structured system logging | ✅ Active |
-| `.info`, `.debug`, `.error` | iOS 14.0+ | iOS 18.0+ | Log level categorization | ✅ Active |
+| `Logging.Logger` | Swift Package | iOS 18.0+ | Structured application logging | ✅ Active |
+| `.info`, `.debug`, `.error`, `.critical` | Swift Package | iOS 18.0+ | Log level categorization | ✅ Active |
 
 ### Testing APIs
 

@@ -472,8 +472,15 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     /// Solve LSCM system using Accelerate sparse solver
     private func solveLSCMSystem(_ system: LSCMSystem) throws -> [SIMD2<Double>] {
         let n = system.systemSize
-        guard n > 0 else {
-            throw FlatteningError.flatteningFailed("Empty system")
+        if n == 0 {
+            // No interior vertices: the solution is fully determined by fixed boundary UVs.
+            // This can happen for very small panels (e.g., a single triangle).
+            let totalVertexCount = system.interiorVertices.count + system.fixedUV.count
+            var fullUVCoordinates: [SIMD2<Double>] = Array(repeating: SIMD2<Double>(0, 0), count: totalVertexCount)
+            for (vertex, uv) in system.fixedUV {
+                fullUVCoordinates[vertex] = uv
+            }
+            return fullUVCoordinates
         }
         
         // Reserved for future sparse solver implementation
@@ -555,6 +562,11 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         var tempResult = Array(repeating: 0.0, count: n)
         vDSP_vmulD(r, 1, r, 1, &tempResult, 1, vDSP_Length(n))
         vDSP_sveD(tempResult, 1, &rsold, vDSP_Length(n))
+
+        // Trivial solution: if RHS is (near) zero, x=0 is already a valid solution.
+        if sqrt(rsold) < tolerance {
+            return x
+        }
         
         for iteration in 0..<maxIterations {
             // Compute Ap
@@ -571,6 +583,10 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             vDSP_sveD(tempResult, 1, &pAp, vDSP_Length(n))
             
             guard abs(pAp) > 1e-14 else {
+                // If residual is already tiny, treat as converged; otherwise the system is ill-conditioned.
+                if sqrt(rsold) < tolerance {
+                    break
+                }
                 throw FlatteningError.flatteningFailed("Singular matrix in CG solver")
             }
             
@@ -624,16 +640,17 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         // Calculate scaling factor from 3D to 2D
         let scaleFactor = try calculateScaleFactor(uvCoordinates: uvCoordinates, meshData: meshData)
         
-        // Apply scaling and convert to CGPoint
+        // Apply scaling and convert to CGPoint (millimeters)
         let scaledPoints = uvCoordinates.map { uv in
             CGPoint(
                 x: uv.x * scaleFactor * 1000.0, // Convert to millimeters
                 y: uv.y * scaleFactor * 1000.0
             )
         }
-        
-        // Add seam allowances (expand boundary outward by 5mm)
-        return addSeamAllowances(scaledPoints, boundary: boundary, allowanceWidth: 5.0)
+
+        // Seam allowances are applied at export time so they can be user-configurable and consistent
+        // across PDF/SVG/PNG outputs.
+        return scaledPoints
     }
     
     /// Calculate appropriate scale factor from 3D to UV mapping
@@ -675,63 +692,6 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         }
         
         return ratioSum / Double(ratioCount)
-    }
-    
-    /// Add seam allowances around boundary
-    private func addSeamAllowances(_ points: [CGPoint], boundary: [Int], allowanceWidth: Double) -> [CGPoint] {
-        var result = points
-        let _ = Set(boundary) // Boundary set for future optimization
-        
-        // For each boundary vertex, offset outward by allowance width
-        for vertex in boundary {
-            guard vertex < result.count else { continue }
-            
-            // Calculate outward normal at boundary vertex
-            let normal = calculateBoundaryNormal(at: vertex, in: boundary, points: result)
-            
-            // Offset point outward
-            result[vertex] = CGPoint(
-                x: result[vertex].x + normal.x * allowanceWidth,
-                y: result[vertex].y + normal.y * allowanceWidth
-            )
-        }
-        
-        return result
-    }
-    
-    /// Calculate outward normal at boundary vertex
-    private func calculateBoundaryNormal(at vertex: Int, in boundary: [Int], points: [CGPoint]) -> CGPoint {
-        guard let index = boundary.firstIndex(of: vertex) else {
-            return CGPoint(x: 0, y: 1) // Default normal
-        }
-        
-        let n = boundary.count
-        let prevIndex = boundary[(index - 1 + n) % n]
-        let nextIndex = boundary[(index + 1) % n]
-        
-        guard vertex < points.count && prevIndex < points.count && nextIndex < points.count else {
-            return CGPoint(x: 0, y: 1)
-        }
-        
-        let current = points[vertex]
-        let prev = points[prevIndex]
-        let next = points[nextIndex]
-        
-        // Average of perpendiculars to adjacent edges
-        let edge1 = CGPoint(x: current.x - prev.x, y: current.y - prev.y)
-        let edge2 = CGPoint(x: next.x - current.x, y: next.y - current.y)
-        
-        // Perpendiculars (rotate 90 degrees)
-        let normal1 = CGPoint(x: -edge1.y, y: edge1.x)
-        let normal2 = CGPoint(x: -edge2.y, y: edge2.x)
-        
-        // Average and normalize
-        let avgNormal = CGPoint(x: normal1.x + normal2.x, y: normal1.y + normal2.y)
-        let length = sqrt(avgNormal.x * avgNormal.x + avgNormal.y * avgNormal.y)
-        
-        guard length > 1e-8 else { return CGPoint(x: 0, y: 1) }
-        
-        return CGPoint(x: avgNormal.x / length, y: avgNormal.y / length)
     }
     
     /// Create edges for the flattened panel
@@ -841,14 +801,13 @@ public extension DefaultDependencyContainer {
     
     /// Register flattening services
     func registerFlatteningServices() {
-        // TODO: Add logging when logger is accessible
-        // logger.info("Registering flattening services")
+        let logger = Logger(label: "com.covercraft.flattening.registration")
+        logger.info("Registering flattening services")
         
         registerSingleton({
             DefaultPatternFlatteningService()
         }, for: PatternFlatteningService.self)
         
-        // TODO: Add logging when logger is accessible
-        // logger.info("Flattening services registration completed")
+        logger.info("Flattening services registration completed")
     }
 }

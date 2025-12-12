@@ -144,10 +144,11 @@ public final class DefaultARScanningService: ARScanningService {
                     let vertices = meshGeometry.vertices
                     let vertexBuffer = vertices.buffer.contents()
                     let vertexStride = vertices.stride
+                    let vertexDataOffset = vertices.offset
                     let vertexCount = vertices.count
                     
                     for i in 0..<vertexCount {
-                        let offset = i * vertexStride
+                        let offset = vertexDataOffset + (i * vertexStride)
                         let vertex = vertexBuffer
                             .advanced(by: offset)
                             .assumingMemoryBound(to: SIMD3<Float>.self)
@@ -164,9 +165,15 @@ public final class DefaultARScanningService: ARScanningService {
                     let faceBuffer = faces.buffer.contents()
                     let faceCount = faces.count
                     let bytesPerIndex = faces.bytesPerIndex
+                    let indicesPerFace = faces.indexCountPerPrimitive
+
+                    guard indicesPerFace == 3 else {
+                        continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported face primitive size: \(indicesPerFace)"))
+                        return
+                    }
                     
                     for i in 0..<faceCount {
-                        let offset = i * faces.indexCountPerPrimitive * bytesPerIndex
+                        let offset = i * indicesPerFace * bytesPerIndex
                         
                         switch bytesPerIndex {
                         case 2:
@@ -186,7 +193,8 @@ public final class DefaultARScanningService: ARScanningService {
                             let i2 = Int(indexPtr[2]) + vertexOffset
                             allTriangleIndices.append(contentsOf: [i0, i1, i2])
                         default:
-                            continue
+                            continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported index size: \(bytesPerIndex) bytes"))
+                            return
                         }
                     }
                     
@@ -214,18 +222,14 @@ public final class DefaultARScanningService: ARScanningService {
 public extension DefaultDependencyContainer {
     
     /// Register AR services
+    @MainActor
     func registerARServices() {
         let logger = Logger(label: "com.covercraft.ar.registration")
         logger.info("Registering AR services")
         
-        registerSingleton({
-            // MainActor.assumeIsolated is safe here because registerARServices()
-            // is only called from app initialization on the main thread.
-            // If this assumption changes, convert to Task { @MainActor in ... }
-            MainActor.assumeIsolated {
-                DefaultARScanningService()
-            }
-        }, for: ARScanningService.self)
+        // Eagerly construct and register on MainActor to avoid `assumeIsolated` traps
+        // and to prevent background-thread factory invocation from crashing.
+        register(DefaultARScanningService(), for: ARScanningService.self)
         
         logger.info("AR services registration completed")
     }

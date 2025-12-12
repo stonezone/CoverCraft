@@ -1,4 +1,5 @@
 import SwiftUI
+import Logging
 import CoverCraftDTO
 import CoverCraftCore
 import CoverCraftAR
@@ -10,6 +11,8 @@ import CoverCraftUI
 @available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct ContentView: View {
+    private let logger = Logger(label: "com.covercraft.feature.contentview")
+
     // MARK: - State
     
     @Environment(\.dependencyContainer) private var container
@@ -187,27 +190,69 @@ public struct ContentView: View {
     
     private var segmentationSection: some View {
         Section {
-            Picker("Resolution", selection: $appState.selectedResolution) {
-                ForEach(SegmentationResolution.allCases, id: \.self) { resolution in
-                    Text(resolution.rawValue).tag(resolution)
+            Picker("Pattern Type", selection: $appState.patternMode) {
+                ForEach(PatternMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
                 }
             }
             .pickerStyle(.menu)
 
-            NavigationLink {
-                SegmentationPreview(
-                    mesh: appState.effectiveMesh,
-                    resolution: appState.selectedResolution,
-                    panels: $appState.currentPanels
-                )
-            } label: {
-                Label("Preview Segmentation", systemImage: "square.grid.3x3")
+            switch appState.patternMode {
+            case .fitted:
+                Picker("Resolution", selection: $appState.selectedResolution) {
+                    ForEach(SegmentationResolution.allCases, id: \.self) { resolution in
+                        Text(resolution.rawValue).tag(resolution)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                NavigationLink {
+                    SegmentationPreview(
+                        mesh: appState.effectiveMesh,
+                        resolution: appState.selectedResolution,
+                        panels: $appState.currentPanels
+                    )
+                } label: {
+                    Label("Preview Segmentation", systemImage: "square.grid.3x3")
+                }
+                .disabled(appState.effectiveMesh == nil)
+            case .slipcover:
+                Picker("Top", selection: $appState.slipcoverTopStyle) {
+                    ForEach(SlipcoverTopStyle.allCases, id: \.self) { style in
+                        Text(style.rawValue).tag(style)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Ease")
+                        Spacer()
+                        Text("\(Int(appState.slipcoverEaseMillimeters))mm")
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $appState.slipcoverEaseMillimeters, in: 0...200, step: 5)
+                }
+
+                Stepper("Segments per side: \(appState.slipcoverSegmentsPerSide)", value: $appState.slipcoverSegmentsPerSide, in: 1...16)
+                Stepper("Vertical segments: \(appState.slipcoverVerticalSegments)", value: $appState.slipcoverVerticalSegments, in: 1...16)
+
+                Picker("Panels", selection: $appState.slipcoverPanelization) {
+                    ForEach(SlipcoverPanelization.allCases, id: \.self) { panelization in
+                        Text(panelization.rawValue).tag(panelization)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
-            .disabled(appState.effectiveMesh == nil)
         } header: {
             Text("3. Panel Configuration")
         } footer: {
-            Text("Higher resolution creates more panels for better fit")
+            switch appState.patternMode {
+            case .fitted:
+                Text("Higher resolution creates more panels for better fit")
+            case .slipcover:
+                Text("Slipcover patterns are robust and gravity-based (bottom-open)")
+            }
         }
     }
     
@@ -251,12 +296,11 @@ public struct ContentView: View {
     private func generatePattern() {
         guard appState.canGeneratePattern else { return }
 
-        guard
-            let segmenter = segmentationService,
-            let flattener = flatteningService,
-            let meshToUse = appState.effectiveMesh
-        else {
-            print("CRITICAL: Required services not registered in dependency container")
+        guard let flattener = flatteningService, let meshToUse = appState.effectiveMesh else {
+            let message = "Required services are not available. Please restart the app."
+            logger.critical("\(message)")
+            errorMessage = message
+            showErrorAlert = true
             return
         }
 
@@ -265,18 +309,46 @@ public struct ContentView: View {
         Task {
             do {
                 let scaledMesh = meshToUse.scaled(by: appState.calibrationData.scaleFactor)
-                let panels = try await segmenter.segmentMesh(
-                    scaledMesh,
-                    targetPanelCount: appState.selectedResolution.targetPanelCount
-                )
-                
-                let flattenedPanels = try await flattener.flattenPanels(panels, from: scaledMesh)
-                
-                await MainActor.run {
-                    appState.currentPanels = panels
-                    appState.flattenedPanels = flattenedPanels
-                    appState.showPatternReady = true
-                    isGeneratingPattern = false
+
+                switch appState.patternMode {
+                case .fitted:
+                    guard let segmenter = segmentationService else {
+                        throw NSError(domain: "CoverCraft", code: 1, userInfo: [NSLocalizedDescriptionKey: "Segmentation service not available"])
+                    }
+
+                    let panels = try await segmenter.segmentMesh(
+                        scaledMesh,
+                        targetPanelCount: appState.selectedResolution.targetPanelCount
+                    )
+
+                    let flattenedPanels = try await flattener.flattenPanels(panels, from: scaledMesh)
+                    let optimizedPanels = try await flattener.optimizeForCutting(flattenedPanels)
+
+                    await MainActor.run {
+                        appState.currentPanels = panels
+                        appState.flattenedPanels = optimizedPanels
+                        appState.showPatternReady = true
+                        isGeneratingPattern = false
+                    }
+                case .slipcover:
+                    let options = SlipcoverPatternOptions(
+                        topStyle: appState.slipcoverTopStyle,
+                        easeMillimeters: appState.slipcoverEaseMillimeters,
+                        segmentsPerSide: appState.slipcoverSegmentsPerSide,
+                        verticalSegments: appState.slipcoverVerticalSegments,
+                        panelization: appState.slipcoverPanelization
+                    )
+
+                    let generator = SlipcoverPatternGenerator()
+                    let generatedPanels = try generator.generate(from: scaledMesh, options: options)
+                    let optimizedPanels = try await flattener.optimizeForCutting(generatedPanels)
+
+                    await MainActor.run {
+                        appState.currentPanels = nil
+                        appState.flattenedPanels = optimizedPanels
+                        appState.showPatternReady = true
+                        isGeneratingPattern = false
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -288,4 +360,3 @@ public struct ContentView: View {
         }
     }
 }
-

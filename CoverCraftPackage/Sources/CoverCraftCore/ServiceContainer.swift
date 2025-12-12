@@ -34,10 +34,10 @@ public enum ServiceContainerError: Error, LocalizedError {
 }
 
 /// Thread-safe dependency injection container.
-/// Uses @unchecked Sendable with NSLock for thread safety.
+/// Uses @unchecked Sendable with NSRecursiveLock for thread safety.
 /// This is safe because all mutable state (services, factories) is protected by `lock`.
 public final class DefaultDependencyContainer: DependencyContainer, @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = NSRecursiveLock()
     private var services: [String: Any] = [:]
     private var factories: [String: () -> Any] = [:]
     private var resolutionStack: Set<String> = []

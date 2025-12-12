@@ -8,6 +8,7 @@ import CoverCraftExport
 
 @preconcurrency import Darwin
 
+#if canImport(UIKit)
 @Suite("Performance Benchmark Tests")
 struct BenchmarkTests {
     
@@ -285,3 +286,5 @@ struct BenchmarkTests {
         return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
 }
+
+#endif
