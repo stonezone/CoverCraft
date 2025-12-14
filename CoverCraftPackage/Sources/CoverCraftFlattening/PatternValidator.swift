@@ -500,15 +500,30 @@ public final class PatternValidator: PatternValidationService {
         return warnings
     }
     
-    /// Validate overlaps between panels
+    /// Validate overlaps between panels using spatial grid optimization
+    /// Complexity reduced from O(n²) to O(n) average case
     private func validatePanelOverlaps(_ panels: [FlattenedPanelDTO]) async -> [ValidationIssue] {
         var issues: [ValidationIssue] = []
-        
-        for i in 0..<panels.count {
-            for j in (i + 1)..<panels.count {
-                let panel1 = panels[i]
-                let panel2 = panels[j]
-                
+        guard panels.count > 1 else { return issues }
+
+        // Build spatial grid for efficient overlap detection
+        let grid = SpatialGrid(panels: panels)
+
+        // Track checked pairs to avoid duplicate checks
+        var checkedPairs: Set<String> = []
+
+        for (index, panel1) in panels.enumerated() {
+            // Only check panels that might overlap (same grid cells)
+            let candidates = grid.potentialOverlaps(for: panel1.boundingBox, excludingIndex: index)
+
+            for candidateIndex in candidates {
+                // Create unique pair key to avoid duplicate checks
+                let pairKey = index < candidateIndex ? "\(index)-\(candidateIndex)" : "\(candidateIndex)-\(index)"
+                guard !checkedPairs.contains(pairKey) else { continue }
+                checkedPairs.insert(pairKey)
+
+                let panel2 = panels[candidateIndex]
+
                 // Quick bounding box intersection test
                 if panel1.boundingBox.intersects(panel2.boundingBox) {
                     // Detailed polygon intersection test
@@ -525,8 +540,77 @@ public final class PatternValidator: PatternValidationService {
                 }
             }
         }
-        
+
         return issues
+    }
+
+    // MARK: - Spatial Grid for O(n) Overlap Detection
+
+    /// Spatial grid for efficient panel overlap detection
+    private struct SpatialGrid {
+        private var cells: [GridCell: [Int]] = [:]
+        private let cellSize: Double
+        private let minX: Double
+        private let minY: Double
+
+        struct GridCell: Hashable {
+            let x: Int
+            let y: Int
+        }
+
+        init(panels: [FlattenedPanelDTO], cellSize: Double = 100.0) {
+            self.cellSize = cellSize
+
+            // Find bounds of all panels
+            var minX = Double.greatestFiniteMagnitude
+            var minY = Double.greatestFiniteMagnitude
+
+            for panel in panels {
+                minX = min(minX, panel.boundingBox.minX)
+                minY = min(minY, panel.boundingBox.minY)
+            }
+
+            self.minX = minX
+            self.minY = minY
+
+            // Insert panels into grid cells
+            for (index, panel) in panels.enumerated() {
+                let bbox = panel.boundingBox
+                let startCellX = Int((bbox.minX - minX) / cellSize)
+                let endCellX = Int((bbox.maxX - minX) / cellSize)
+                let startCellY = Int((bbox.minY - minY) / cellSize)
+                let endCellY = Int((bbox.maxY - minY) / cellSize)
+
+                for cellX in startCellX...endCellX {
+                    for cellY in startCellY...endCellY {
+                        let cell = GridCell(x: cellX, y: cellY)
+                        cells[cell, default: []].append(index)
+                    }
+                }
+            }
+        }
+
+        func potentialOverlaps(for bbox: CGRect, excludingIndex: Int) -> Set<Int> {
+            var candidates: Set<Int> = []
+
+            let startCellX = Int((bbox.minX - minX) / cellSize)
+            let endCellX = Int((bbox.maxX - minX) / cellSize)
+            let startCellY = Int((bbox.minY - minY) / cellSize)
+            let endCellY = Int((bbox.maxY - minY) / cellSize)
+
+            for cellX in startCellX...endCellX {
+                for cellY in startCellY...endCellY {
+                    let cell = GridCell(x: cellX, y: cellY)
+                    if let indices = cells[cell] {
+                        for index in indices where index != excludingIndex {
+                            candidates.insert(index)
+                        }
+                    }
+                }
+            }
+
+            return candidates
+        }
     }
     
     /// Validate fabric compatibility
