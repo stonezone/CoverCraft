@@ -161,7 +161,7 @@ let package = Package(
             resources: [.process("Fixtures")]
         ),
         .testTarget(
-            name: "CoverCraftFlatteningTests", 
+            name: "CoverCraftFlatteningTests",
             dependencies: [
                 "CoverCraftFlattening",
                 "CoverCraftCore",
@@ -219,15 +219,12 @@ let package = Package(
             resources: [.process("Fixtures")]
         ),
         .testTarget(
-            name: "ContractTests", 
+            name: "ContractTests",
             dependencies: [
                 "CoverCraftDTO",
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            exclude: [
-                "DTOContractTests.swift.disabled"
             ]
         ),
         .testTarget(

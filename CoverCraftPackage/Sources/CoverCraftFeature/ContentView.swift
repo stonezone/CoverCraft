@@ -17,23 +17,13 @@ public struct ContentView: View {
     
     @Environment(\.dependencyContainer) private var container
     
-    // MARK: - Dependencies
-    
-    private var arService: ARScanningService? {
-        container.resolve(ARScanningService.self)
-    }
-    
-    private var segmentationService: MeshSegmentationService? {
-        container.resolve(MeshSegmentationService.self)
-    }
-    
-    private var flatteningService: PatternFlatteningService? {
-        container.resolve(PatternFlatteningService.self)
-    }
+    // MARK: - Dependencies (resolved once on appear)
 
-    private var hapticService: HapticService? {
-        container.resolve(HapticService.self)
-    }
+    @State private var arService: ARScanningService?
+    @State private var segmentationService: MeshSegmentationService?
+    @State private var flatteningService: PatternFlatteningService?
+    @State private var hapticService: HapticService?
+    @State private var servicesResolved = false
 
     @State private var appState = AppState()
     @State private var showingScanner = false
@@ -93,6 +83,14 @@ public struct ContentView: View {
                 }
             } message: {
                 Text("Fitted mode uses experimental mesh segmentation that may produce inconsistent results. Slipcover mode is recommended for reliable patterns.")
+            }
+            .task {
+                guard !servicesResolved else { return }
+                arService = container.resolve(ARScanningService.self)
+                segmentationService = container.resolve(MeshSegmentationService.self)
+                flatteningService = container.resolve(PatternFlatteningService.self)
+                hapticService = container.resolve(HapticService.self)
+                servicesResolved = true
             }
         }
     }
