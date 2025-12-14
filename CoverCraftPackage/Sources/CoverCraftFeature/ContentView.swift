@@ -30,14 +30,20 @@ public struct ContentView: View {
     private var flatteningService: PatternFlatteningService? {
         container.resolve(PatternFlatteningService.self)
     }
-    
+
+    private var hapticService: HapticService? {
+        container.resolve(HapticService.self)
+    }
+
     @State private var appState = AppState()
     @State private var showingScanner = false
     @State private var showingHelp = false
+    @State private var showingExportView = false
     @State private var isGeneratingPattern = false
     @State private var errorMessage: String?
     @State private var showErrorAlert = false
-    
+    @State private var showFittedModeWarning = false
+
     public init() {}
     
     // MARK: - Body
@@ -66,14 +72,27 @@ public struct ContentView: View {
             }
             .alert("Pattern Generated", isPresented: $appState.showPatternReady) {
                 Button("View Pattern") {
-                    // Navigate to export view
+                    showingExportView = true
                 }
                 Button("OK", role: .cancel) { }
+            }
+            .sheet(isPresented: $showingExportView) {
+                NavigationStack {
+                    ExportView(flattenedPanels: appState.flattenedPanels)
+                }
             }
             .alert("Pattern Generation Failed", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage ?? "Unknown error occurred")
+            }
+            .alert("Experimental Feature", isPresented: $showFittedModeWarning) {
+                Button("Continue Anyway") { }
+                Button("Use Slipcover", role: .cancel) {
+                    appState.patternMode = .slipcover
+                }
+            } message: {
+                Text("Fitted mode uses experimental mesh segmentation that may produce inconsistent results. Slipcover mode is recommended for reliable patterns.")
             }
         }
     }
@@ -82,44 +101,64 @@ public struct ContentView: View {
     
     private var scanSection: some View {
         Section {
-            Button(action: { showingScanner = true }) {
-                Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
+            Picker("Input", selection: $appState.inputMode) {
+                ForEach(PatternInputMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
             }
+            .pickerStyle(.menu)
 
-            if let meshDTO = appState.currentMesh {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
-                            .font(.caption)
-                        Spacer()
-                        Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
+            switch appState.inputMode {
+            case .scan:
+                Button(action: { showingScanner = true }) {
+                    Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
+                }
 
-                    // Mesh quality info
-                    let boundaryInfo = meshDTO.analyzeBoundaries()
-                    HStack {
-                        if boundaryInfo.isWatertight {
-                            Label("Watertight", systemImage: "checkmark.seal.fill")
+                if let meshDTO = appState.currentMesh {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
                                 .font(.caption)
-                                .foregroundColor(.green)
-                        } else {
-                            Label("\(boundaryInfo.holeCount) hole\(boundaryInfo.holeCount == 1 ? "" : "s")", systemImage: "circle.dashed")
+                            Spacer()
+                            Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
                                 .font(.caption)
-                                .foregroundColor(.orange)
                         }
-                        Spacer()
-                        if !boundaryInfo.isWatertight {
-                            Text("\(boundaryInfo.boundaryEdges.count) boundary edges")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                        .foregroundColor(.secondary)
+
+                        // Mesh quality info
+                        let boundaryInfo = meshDTO.analyzeBoundaries()
+                        HStack {
+                            if boundaryInfo.isWatertight {
+                                Label("Watertight", systemImage: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Label("\(boundaryInfo.holeCount) hole\(boundaryInfo.holeCount == 1 ? "" : "s")", systemImage: "circle.dashed")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            Spacer()
+                            if !boundaryInfo.isWatertight {
+                                Text("\(boundaryInfo.boundaryEdges.count) boundary edges")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
+
+            case .manual:
+                VStack(alignment: .leading, spacing: 10) {
+                    dimensionField("Width (W)", value: $appState.manualWidthMillimeters)
+                    dimensionField("Depth (D)", value: $appState.manualDepthMillimeters)
+                    dimensionField("Height (H)", value: $appState.manualHeightMillimeters)
+                    Text("Enter object dimensions (10-10,000mm). Ease is added during pattern generation.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         } header: {
-            Text("1. Scan Object")
+            Text("1. Input")
         }
     }
     
@@ -173,7 +212,7 @@ public struct ContentView: View {
             } label: {
                 Label("Set Real-World Scale", systemImage: "ruler")
             }
-            .disabled(appState.effectiveMesh == nil)
+            .disabled(appState.inputMode != .scan || appState.effectiveMesh == nil)
 
             if appState.calibrationData.isComplete {
                 HStack {
@@ -185,6 +224,10 @@ public struct ContentView: View {
             }
         } header: {
             Text("2. Calibration")
+        } footer: {
+            if appState.inputMode == .manual {
+                Text("Not required for Manual Dimensions.")
+            }
         }
     }
     
@@ -196,6 +239,12 @@ public struct ContentView: View {
                 }
             }
             .pickerStyle(.menu)
+            .disabled(appState.inputMode == .manual)
+            .onChange(of: appState.patternMode) { _, newMode in
+                if newMode == .fitted {
+                    showFittedModeWarning = true
+                }
+            }
 
             switch appState.patternMode {
             case .fitted:
@@ -232,6 +281,16 @@ public struct ContentView: View {
                             .foregroundColor(.secondary)
                     }
                     Slider(value: $appState.slipcoverEaseMillimeters, in: 0...200, step: 5)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Seam Allowance")
+                        Spacer()
+                        Text("\(Int(appState.slipcoverSeamAllowanceMillimeters))mm")
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $appState.slipcoverSeamAllowanceMillimeters, in: 3...50, step: 1)
                 }
 
                 Stepper("Segments per side: \(appState.slipcoverSegmentsPerSide)", value: $appState.slipcoverSegmentsPerSide, in: 1...16)
@@ -291,12 +350,36 @@ public struct ContentView: View {
         }
     }
     
+    // MARK: - Helper Views
+
+    private func dimensionField(_ label: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(label)
+                .frame(width: 80, alignment: .leading)
+            TextField("mm", value: value, format: .number)
+                .multilineTextAlignment(.trailing)
+                #if canImport(UIKit)
+                .keyboardType(.decimalPad)
+                #endif
+                .frame(minWidth: 80)
+                .onChange(of: value.wrappedValue) { _, newValue in
+                    // Clamp to valid range: 10-10,000mm
+                    let clamped = min(max(newValue, 10), 10000)
+                    if clamped != newValue {
+                        value.wrappedValue = clamped
+                    }
+                }
+            Text("mm")
+                .foregroundColor(.secondary)
+        }
+    }
+
     // MARK: - Actions
-    
+
     private func generatePattern() {
         guard appState.canGeneratePattern else { return }
 
-        guard let flattener = flatteningService, let meshToUse = appState.effectiveMesh else {
+        guard let flattener = flatteningService else {
             let message = "Required services are not available. Please restart the app."
             logger.critical("\(message)")
             errorMessage = message
@@ -308,10 +391,12 @@ public struct ContentView: View {
 
         Task {
             do {
-                let scaledMesh = meshToUse.scaled(by: appState.calibrationData.scaleFactor)
-
                 switch appState.patternMode {
                 case .fitted:
+                    guard appState.inputMode == .scan, let meshToUse = appState.effectiveMesh else {
+                        throw NSError(domain: "CoverCraft", code: 2, userInfo: [NSLocalizedDescriptionKey: "Fitted patterns require a LiDAR scan and calibration."])
+                    }
+                    let scaledMesh = meshToUse.scaled(by: appState.calibrationData.scaleFactor)
                     guard let segmenter = segmentationService else {
                         throw NSError(domain: "CoverCraft", code: 1, userInfo: [NSLocalizedDescriptionKey: "Segmentation service not available"])
                     }
@@ -329,18 +414,45 @@ public struct ContentView: View {
                         appState.flattenedPanels = optimizedPanels
                         appState.showPatternReady = true
                         isGeneratingPattern = false
+                        hapticService?.success()
                     }
                 case .slipcover:
+                    // Capture values from @MainActor state before background work
                     let options = SlipcoverPatternOptions(
                         topStyle: appState.slipcoverTopStyle,
                         easeMillimeters: appState.slipcoverEaseMillimeters,
+                        seamAllowanceMillimeters: appState.slipcoverSeamAllowanceMillimeters,
                         segmentsPerSide: appState.slipcoverSegmentsPerSide,
                         verticalSegments: appState.slipcoverVerticalSegments,
                         panelization: appState.slipcoverPanelization
                     )
+                    let inputMode = appState.inputMode
+                    let effectiveMesh = appState.effectiveMesh
+                    let scaleFactor = appState.calibrationData.scaleFactor
+                    let manualWidth = appState.manualWidthMillimeters
+                    let manualDepth = appState.manualDepthMillimeters
+                    let manualHeight = appState.manualHeightMillimeters
 
-                    let generator = SlipcoverPatternGenerator()
-                    let generatedPanels = try generator.generate(from: scaledMesh, options: options)
+                    // Run synchronous generation off main actor to avoid UI blocking
+                    let generatedPanels: [FlattenedPanelDTO] = try await Task.detached {
+                        let generator = SlipcoverPatternGenerator()
+                        switch inputMode {
+                        case .scan:
+                            guard let meshToUse = effectiveMesh else {
+                                throw NSError(domain: "CoverCraft", code: 3, userInfo: [NSLocalizedDescriptionKey: "No mesh available."])
+                            }
+                            let scaledMesh = meshToUse.scaled(by: scaleFactor)
+                            return try generator.generate(from: scaledMesh, options: options)
+                        case .manual:
+                            return try generator.generate(
+                                widthMillimeters: manualWidth,
+                                depthMillimeters: manualDepth,
+                                heightMillimeters: manualHeight,
+                                options: options
+                            )
+                        }
+                    }.value
+
                     let optimizedPanels = try await flattener.optimizeForCutting(generatedPanels)
 
                     await MainActor.run {
@@ -348,6 +460,7 @@ public struct ContentView: View {
                         appState.flattenedPanels = optimizedPanels
                         appState.showPatternReady = true
                         isGeneratingPattern = false
+                        hapticService?.success()
                     }
                 }
             } catch {
@@ -355,6 +468,7 @@ public struct ContentView: View {
                     isGeneratingPattern = false
                     errorMessage = error.localizedDescription
                     showErrorAlert = true
+                    hapticService?.error()
                 }
             }
         }

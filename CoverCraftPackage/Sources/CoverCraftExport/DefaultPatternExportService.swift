@@ -218,6 +218,26 @@ public final class DefaultPatternExportService: PatternExportService {
         
         """
 
+        if options.includeRegistrationMarks {
+            let markSize: CGFloat = 6
+            let corners = [
+                CGPoint(x: paddedBounds.minX, y: paddedBounds.minY),
+                CGPoint(x: paddedBounds.maxX, y: paddedBounds.minY),
+                CGPoint(x: paddedBounds.minX, y: paddedBounds.maxY),
+                CGPoint(x: paddedBounds.maxX, y: paddedBounds.maxY)
+            ]
+
+            svg += "  <g id=\"registration\">\n"
+            for corner in corners {
+                svg += """
+                  <line x1="\(f(corner.x - markSize / 2))" y1="\(f(corner.y))" x2="\(f(corner.x + markSize / 2))" y2="\(f(corner.y))" class="cal" />
+                  <line x1="\(f(corner.x))" y1="\(f(corner.y - markSize / 2))" x2="\(f(corner.x))" y2="\(f(corner.y + markSize / 2))" class="cal" />
+
+                """
+            }
+            svg += "  </g>\n\n"
+        }
+
         // Panels (cut lines + optional seam allowance)
         for (index, panel) in panels.enumerated() {
             let pathData = generateSVGPath(for: panel)
@@ -236,6 +256,15 @@ public final class DefaultPatternExportService: PatternExportService {
                     """
                 }
             }
+
+            let bbox = panel.boundingBox
+            let labelX = bbox.minX + 2
+            let labelY = bbox.minY + 8
+            let label = "P\(index + 1) \(Int(round(bbox.width)))×\(Int(round(bbox.height)))mm"
+            svg += """
+              <text x="\(f(labelX))" y="\(f(labelY))" class="label">\(label)</text>
+
+            """
         }
 
         svg += "</svg>"
@@ -488,7 +517,8 @@ public final class DefaultPatternExportService: PatternExportService {
         context.saveGState()
         context.scaleBy(x: 1, y: -1) // Flip text back to normal orientation
         
-        let label = "Panel \(index + 1)"
+        let bbox = panel.boundingBox
+        let label = "Panel \(index + 1)  \(Int(round(bbox.width)))×\(Int(round(bbox.height)))mm"
         let labelAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.boldSystemFont(ofSize: 12),
             .foregroundColor: UIColor.black
@@ -749,7 +779,8 @@ public final class DefaultPatternExportService: PatternExportService {
         context.saveGState()
         context.scaleBy(x: 1, y: -1) // Flip text back to normal orientation
         
-        let label = "Panel \(index + 1)"
+        let bbox = panel.boundingBox
+        let label = "Panel \(index + 1)  \(Int(round(bbox.width)))×\(Int(round(bbox.height)))mm"
         let labelFontSize = 14 * dpi / 72
         let labelAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.boldSystemFont(ofSize: labelFontSize),

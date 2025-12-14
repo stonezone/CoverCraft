@@ -83,30 +83,30 @@ public final class DefaultDependencyContainer: DependencyContainer, @unchecked S
     /// Resolve a service instance
     public func resolve<T>(_ type: T.Type) -> T? {
         return lock.withLock {
-        let key = String(describing: type)
-        
-        // Check for circular dependencies
-        guard !resolutionStack.contains(key) else {
-            logger.error("Circular dependency detected for: \(key)")
-            return nil
-        }
-        
-        // Check if instance already exists
-        if let service = services[key] as? T {
-            return service
-        }
-        
-        // Try to create from factory
-        if let factory = factories[key] {
-            resolutionStack.insert(key)
-            defer { resolutionStack.remove(key) }
-            
-            let instance = factory() as? T
-            logger.debug("Created instance: \(key)")
-            return instance
-        }
-        
-        logger.warning("Service not found: \(key)")
+            let key = String(describing: type)
+
+            // Check for circular dependencies
+            guard !resolutionStack.contains(key) else {
+                logger.error("Circular dependency detected for: \(key)")
+                return nil
+            }
+
+            // Check if instance already exists
+            if let service = services[key] as? T {
+                return service
+            }
+
+            // Try to create from factory
+            if let factory = factories[key] {
+                resolutionStack.insert(key)
+                defer { resolutionStack.remove(key) }
+
+                let instance = factory() as? T
+                logger.debug("Created instance: \(key)")
+                return instance
+            }
+
+            logger.warning("Service not found: \(key)")
             return nil
         }
     }

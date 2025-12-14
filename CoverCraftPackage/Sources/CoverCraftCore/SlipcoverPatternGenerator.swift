@@ -48,13 +48,43 @@ public struct SlipcoverPatternGenerator: Sendable {
         let depthMm = Double(sizeMeters.z) * 1000.0 + 2.0 * easeMm
         let heightMm = Double(sizeMeters.y) * 1000.0 + easeMm
 
+        return try generatePanels(widthMm: widthMm, depthMm: depthMm, heightMm: heightMm, options: options)
+    }
+
+    /// Generate a slipcover pattern directly from object dimensions (millimeters).
+    ///
+    /// - Parameters:
+    ///   - widthMillimeters: Object width (X) in millimeters.
+    ///   - depthMillimeters: Object depth (Z) in millimeters.
+    ///   - heightMillimeters: Object height (Y) in millimeters.
+    ///   - options: Slipcover options (ease in millimeters, panelization, etc).
+    public func generate(
+        widthMillimeters: Double,
+        depthMillimeters: Double,
+        heightMillimeters: Double,
+        options: SlipcoverPatternOptions
+    ) throws -> [FlattenedPanelDTO] {
+        let easeMm = options.easeMillimeters
+        let widthMm = widthMillimeters + 2.0 * easeMm
+        let depthMm = depthMillimeters + 2.0 * easeMm
+        let heightMm = heightMillimeters + easeMm
+
+        return try generatePanels(widthMm: widthMm, depthMm: depthMm, heightMm: heightMm, options: options)
+    }
+
+    private func generatePanels(
+        widthMm: Double,
+        depthMm: Double,
+        heightMm: Double,
+        options: SlipcoverPatternOptions
+    ) throws -> [FlattenedPanelDTO] {
         guard widthMm > 1, depthMm > 1, heightMm > 1 else {
             throw SlipcoverPatternGenerationError.degenerateDimensions
         }
 
         let segmentsPerSide = max(1, options.segmentsPerSide)
         let verticalSegments = max(1, options.verticalSegments)
-        let seamWidthMm: Double = 5.0
+        let seamWidthMm = options.seamAllowanceMillimeters
 
         let colors: [ColorDTO] = [.red, .green, .blue, .yellow, .orange, .purple, .cyan, .magenta]
         var colorIndex = 0
@@ -162,4 +192,3 @@ public struct SlipcoverPatternGenerator: Sendable {
         return panels
     }
 }
-

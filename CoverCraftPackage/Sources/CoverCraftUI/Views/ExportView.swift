@@ -240,12 +240,16 @@ public struct ExportView: View {
 
                     let result = try await service.exportPatterns(panels, format: selectedFormat, options: options)
 
-                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(result.filename)
-                    try result.data.write(to: tempURL, options: .atomic)
+                    // Save to Documents directory for persistence (not temp)
+                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    let patternsFolder = documentsURL.appendingPathComponent("CoverCraft Patterns", isDirectory: true)
+                    try FileManager.default.createDirectory(at: patternsFolder, withIntermediateDirectories: true)
+                    let fileURL = patternsFolder.appendingPathComponent(result.filename)
+                    try result.data.write(to: fileURL, options: .atomic)
 
                     return ExportOutcome.success(
-                        message: "Exported pattern to \(result.filename)",
-                        url: tempURL
+                        message: "Saved to CoverCraft Patterns/\(result.filename)",
+                        url: fileURL
                     )
                 }.value
 

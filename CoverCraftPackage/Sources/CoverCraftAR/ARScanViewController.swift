@@ -20,12 +20,19 @@ public final class ARScanViewController: UIViewController {
     private var coachingOverlay: ARCoachingOverlayView!
     private var finishButton: UIButton!
     private var vertexCountLabel: UILabel!
+    private var qualityContainerView: UIView!
+    private var qualityProgressView: UIProgressView!
+    private var qualityLabel: UILabel!
     private var depthSlider: UISlider!
     private var depthLabel: UILabel!
     private var depthLimitIndicator: SCNNode?
 
     // Mesh data storage
     private var collectedMeshAnchors: [UUID: ARMeshAnchor] = [:]
+    private var anchorInsertionOrder: [UUID] = []  // Track insertion order for FIFO pruning
+
+    // Memory management - limit anchor count to prevent unbounded growth
+    private let maxAnchorCount: Int = 150
 
     // Depth limiting - default 2 meters, range 0.3m to 5m
     private var maxDepth: Float = 2.0
@@ -44,6 +51,7 @@ public final class ARScanViewController: UIViewController {
         setupCoachingOverlay()
         setupFinishButton()
         setupVertexCountLabel()
+        setupQualityIndicator()
         setupDepthSlider()
 
         logger.info("ARScanViewController loaded")
@@ -133,6 +141,93 @@ public final class ARScanViewController: UIViewController {
             vertexCountLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 150),
             vertexCountLabel.heightAnchor.constraint(equalToConstant: 40)
         ])
+    }
+
+    private func setupQualityIndicator() {
+        // Container
+        qualityContainerView = UIView()
+        qualityContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        qualityContainerView.layer.cornerRadius = 8
+        qualityContainerView.clipsToBounds = true
+        qualityContainerView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(qualityContainerView)
+
+        // Quality label
+        qualityLabel = UILabel()
+        qualityLabel.text = "Scan Quality: Poor"
+        qualityLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        qualityLabel.textColor = .white
+        qualityLabel.textAlignment = .center
+        qualityLabel.translatesAutoresizingMaskIntoConstraints = false
+        qualityContainerView.addSubview(qualityLabel)
+
+        // Progress bar
+        qualityProgressView = UIProgressView(progressViewStyle: .default)
+        qualityProgressView.progress = 0.0
+        qualityProgressView.trackTintColor = .darkGray
+        qualityProgressView.progressTintColor = .systemRed
+        qualityProgressView.translatesAutoresizingMaskIntoConstraints = false
+        qualityContainerView.addSubview(qualityProgressView)
+
+        NSLayoutConstraint.activate([
+            qualityContainerView.topAnchor.constraint(equalTo: vertexCountLabel.bottomAnchor, constant: 8),
+            qualityContainerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            qualityContainerView.widthAnchor.constraint(equalToConstant: 200),
+            qualityContainerView.heightAnchor.constraint(equalToConstant: 50),
+
+            qualityLabel.topAnchor.constraint(equalTo: qualityContainerView.topAnchor, constant: 6),
+            qualityLabel.leadingAnchor.constraint(equalTo: qualityContainerView.leadingAnchor, constant: 8),
+            qualityLabel.trailingAnchor.constraint(equalTo: qualityContainerView.trailingAnchor, constant: -8),
+
+            qualityProgressView.topAnchor.constraint(equalTo: qualityLabel.bottomAnchor, constant: 6),
+            qualityProgressView.leadingAnchor.constraint(equalTo: qualityContainerView.leadingAnchor, constant: 16),
+            qualityProgressView.trailingAnchor.constraint(equalTo: qualityContainerView.trailingAnchor, constant: -16)
+        ])
+    }
+
+    /// Calculate and update the scan quality indicator based on mesh metrics
+    private func updateQualityIndicator(vertices: Int, triangles: Int, anchors: Int) {
+        // Quality thresholds based on typical scan metrics
+        // Poor: < 5000 vertices, Fair: 5000-20000, Good: 20000-50000, Excellent: > 50000
+        let vertexScore: Float
+        switch vertices {
+        case 0..<5000: vertexScore = Float(vertices) / 5000.0 * 0.25
+        case 5000..<20000: vertexScore = 0.25 + Float(vertices - 5000) / 15000.0 * 0.25
+        case 20000..<50000: vertexScore = 0.5 + Float(vertices - 20000) / 30000.0 * 0.25
+        default: vertexScore = 0.75 + min(Float(vertices - 50000) / 50000.0, 1.0) * 0.25
+        }
+
+        // Also factor in triangle count and anchor coverage
+        let triangleScore: Float = min(Float(triangles) / 100000.0, 1.0)
+        let anchorScore: Float = min(Float(anchors) / 50.0, 1.0)
+
+        // Weighted average: vertices most important, then triangles, then anchors
+        let quality = vertexScore * 0.5 + triangleScore * 0.3 + anchorScore * 0.2
+
+        // Update UI
+        qualityProgressView.setProgress(quality, animated: true)
+
+        // Update label and color based on quality level
+        let qualityText: String
+        let qualityColor: UIColor
+
+        switch quality {
+        case 0..<0.25:
+            qualityText = "Poor"
+            qualityColor = .systemRed
+        case 0.25..<0.5:
+            qualityText = "Fair"
+            qualityColor = .systemOrange
+        case 0.5..<0.75:
+            qualityText = "Good"
+            qualityColor = .systemYellow
+        default:
+            qualityText = "Excellent"
+            qualityColor = .systemGreen
+        }
+
+        qualityLabel.text = "Scan Quality: \(qualityText)"
+        qualityProgressView.progressTintColor = qualityColor
     }
 
     private func setupDepthSlider() {
@@ -484,11 +579,23 @@ extension ARScanViewController: ARSessionDelegate {
 
             // Store anchors for final mesh building using pre-extracted data
             for (identifier, meshAnchor) in anchorData {
+                // Track insertion order for new anchors
+                if self.collectedMeshAnchors[identifier] == nil {
+                    self.anchorInsertionOrder.append(identifier)
+                }
                 self.collectedMeshAnchors[identifier] = meshAnchor
+            }
+
+            // Prune oldest anchors if count exceeds limit (FIFO eviction)
+            while self.collectedMeshAnchors.count > self.maxAnchorCount,
+                  !self.anchorInsertionOrder.isEmpty {
+                let oldestId = self.anchorInsertionOrder.removeFirst()
+                self.collectedMeshAnchors.removeValue(forKey: oldestId)
             }
 
             // Update UI with pre-computed statistics
             self.vertexCountLabel.text = "\(totalVertices) verts | \(totalTriangles) tris"
+            self.updateQualityIndicator(vertices: totalVertices, triangles: totalTriangles, anchors: anchorCount)
 
             // Log periodically (every ~1 second)
             if timestamp.truncatingRemainder(dividingBy: 1.0) < 0.05 {

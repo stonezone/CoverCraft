@@ -31,7 +31,8 @@ INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLand
 // Privacy Permissions
 // ==========================================
 INFOPLIST_KEY_NSCameraUsageDescription = "CoverCraft needs camera access to scan objects with LiDAR"
-INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CoverCraft uses ARKit which requires location access for world tracking"
+// NOTE: Location permission removed - ARWorldTrackingConfiguration uses .gravity alignment,
+// not .gravityAndHeading, so location access is not required for this app.
 
 // ==========================================
 // Required Device Capabilities

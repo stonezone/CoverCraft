@@ -16,10 +16,12 @@ public enum SlipcoverPanelization: String, Sendable, Codable, CaseIterable {
 ///
 /// Units:
 /// - `easeMillimeters` is in millimeters and is applied to X/Z extents.
+/// - `seamAllowanceMillimeters` is in millimeters for seam allowance width.
 @available(iOS 18.0, macOS 15.0, *)
 public struct SlipcoverPatternOptions: Sendable, Codable, Equatable {
     public var topStyle: SlipcoverTopStyle
     public var easeMillimeters: Double
+    public var seamAllowanceMillimeters: Double
     public var segmentsPerSide: Int
     public var verticalSegments: Int
     public var panelization: SlipcoverPanelization
@@ -27,12 +29,14 @@ public struct SlipcoverPatternOptions: Sendable, Codable, Equatable {
     public init(
         topStyle: SlipcoverTopStyle = .closed,
         easeMillimeters: Double = 20,
+        seamAllowanceMillimeters: Double = 15,
         segmentsPerSide: Int = 1,
         verticalSegments: Int = 1,
         panelization: SlipcoverPanelization = .quads
     ) {
         self.topStyle = topStyle
         self.easeMillimeters = max(0, easeMillimeters)
+        self.seamAllowanceMillimeters = max(3, min(seamAllowanceMillimeters, 50)) // Clamp 3-50mm
         self.segmentsPerSide = max(1, segmentsPerSide)
         self.verticalSegments = max(1, verticalSegments)
         self.panelization = panelization

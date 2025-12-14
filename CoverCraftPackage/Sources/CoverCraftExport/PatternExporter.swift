@@ -30,6 +30,9 @@ typealias PlatformImage = NSImage
 /// - Simpler rendering pipeline
 /// - Does NOT implement PatternExportService protocol to avoid DI ambiguity
 ///
+/// IMPORTANT: DXF export is NOT supported in this legacy exporter. Use DefaultPatternExportService
+/// which correctly validates and rejects DXF requests until full implementation is available.
+///
 @available(iOS 18.0, macOS 15.0, *)
 public actor PatternExporter {
     
@@ -50,7 +53,7 @@ public actor PatternExporter {
         case .pdf:
             return try await exportToPDF(panels, pageSize: .a4)
         case .dxf:
-            return try await exportToDXF(panels)
+            throw ExportError.unsupportedFormat
         }
     }
     
@@ -545,72 +548,6 @@ public actor PatternExporter {
         }
         
         return FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-    }
-    
-    private func exportToDXF(_ panels: [FlattenedPanelDTO]) async throws -> URL {
-        // For now, provide a basic DXF export stub
-        // TODO: Implement proper DXF export functionality
-        let fileManager = FileManager.default
-        let temporaryDirectory = fileManager.temporaryDirectory
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        let timestamp = formatter.string(from: Date())
-        let filename = "CoverCraft_Pattern_\(timestamp).dxf"
-        let fileURL = temporaryDirectory.appendingPathComponent(filename)
-        
-        // Create basic DXF content
-        var dxfContent = """
-        0
-        SECTION
-        2
-        HEADER
-        0
-        ENDSEC
-        0
-        SECTION
-        2
-        ENTITIES
-        """
-        
-        // Add panel entities
-        for panel in panels {
-            for edge in panel.edges {
-                let startPoint = panel.points2D[edge.startIndex]
-                let endPoint = panel.points2D[edge.endIndex]
-                
-                dxfContent += """
-        
-        0
-        LINE
-        8
-        0
-        10
-        \(startPoint.x)
-        20
-        \(startPoint.y)
-        30
-        0.0
-        11
-        \(endPoint.x)
-        21
-        \(endPoint.y)
-        31
-        0.0
-        """
-            }
-        }
-        
-        dxfContent += """
-        
-        0
-        ENDSEC
-        0
-        EOF
-        """
-        
-        try dxfContent.write(to: fileURL, atomically: true, encoding: .utf8)
-        return fileURL
     }
     
     public enum PageSize {

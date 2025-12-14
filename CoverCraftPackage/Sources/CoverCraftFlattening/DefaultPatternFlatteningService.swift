@@ -85,13 +85,23 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return flattenedPanels
     }
     
+    /// Arranges panels for cutting layout.
+    ///
+    /// - Important: This is a **basic grid layout** implementation, NOT an optimized bin packing algorithm.
+    ///   It arranges panels left-to-right in rows with a fixed 800pt width constraint.
+    ///   For production use with fabric efficiency requirements, consider implementing:
+    ///   - Guillotine bin packing
+    ///   - Shelf algorithms (First Fit Decreasing Height)
+    ///   - Or integrating a library like libnest2d
+    ///
+    /// - Parameter panels: Flattened panels to arrange
+    /// - Returns: Panels with translated positions for non-overlapping layout
     public func optimizeForCutting(_ panels: [FlattenedPanelDTO]) async throws -> [FlattenedPanelDTO] {
-        logger.info("Optimizing \(panels.count) panels for cutting")
-        
-        // Placeholder optimization - in real app this would pack panels efficiently
+        logger.info("Optimizing \(panels.count) panels for cutting (basic grid layout)")
+
         var optimized = panels
-        
-        // Simple optimization: arrange panels in a grid layout
+
+        // Basic grid layout: arrange panels in rows
         var currentX: Double = 0
         var currentY: Double = 0
         var maxRowHeight: Double = 0
@@ -341,10 +351,11 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             }
             
             guard let edge = nextEdge else { break }
-            
+
             visited.insert(edge)
-            currentVertex = edge.other(currentVertex)
-            
+            guard let nextVertex = edge.other(currentVertex) else { break }
+            currentVertex = nextVertex
+
             // Check if we've completed the loop
             if currentVertex == boundary.first {
                 break
@@ -773,13 +784,13 @@ private struct Edge: Hashable {
         return vertex == v0 || vertex == v1
     }
     
-    func other(_ vertex: Int) -> Int {
+    func other(_ vertex: Int) -> Int? {
         if vertex == v0 {
             return v1
         } else if vertex == v1 {
             return v0
         } else {
-            fatalError("Vertex \(vertex) is not part of edge (\(v0), \(v1))")
+            return nil
         }
     }
 }
