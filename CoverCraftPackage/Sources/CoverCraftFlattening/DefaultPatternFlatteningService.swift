@@ -9,15 +9,79 @@ import CoverCraftCore
 import CoverCraftDTO
 import Accelerate
 
-/// Default implementation of pattern flattening service  
+// MARK: - Flattening Cache
+
+/// Thread-safe cache actor for flattened panels
+@available(iOS 18.0, macOS 15.0, *)
+private actor FlatteningCache {
+    private var cache: [CacheKey: FlattenedPanelDTO] = [:]
+    private var hits = 0
+    private var misses = 0
+
+    struct CacheKey: Hashable {
+        let panelId: UUID
+        let meshId: UUID
+    }
+
+    func get(panelId: UUID, meshId: UUID) -> FlattenedPanelDTO? {
+        let key = CacheKey(panelId: panelId, meshId: meshId)
+        if let cached = cache[key] {
+            hits += 1
+            return cached
+        }
+        misses += 1
+        return nil
+    }
+
+    func set(_ panel: FlattenedPanelDTO, panelId: UUID, meshId: UUID) {
+        let key = CacheKey(panelId: panelId, meshId: meshId)
+        cache[key] = panel
+
+        // Evict oldest entries if cache grows too large (simple LRU would be better)
+        if cache.count > 100 {
+            let keysToRemove = Array(cache.keys.prefix(20))
+            for key in keysToRemove {
+                cache.removeValue(forKey: key)
+            }
+        }
+    }
+
+    func clear() {
+        cache.removeAll()
+        hits = 0
+        misses = 0
+    }
+
+    var statistics: (hits: Int, misses: Int, hitRate: Double) {
+        let total = hits + misses
+        let hitRate = total > 0 ? Double(hits) / Double(total) : 0.0
+        return (hits: hits, misses: misses, hitRate: hitRate)
+    }
+}
+
+/// Default implementation of pattern flattening service
 @available(iOS 18.0, macOS 15.0, *)
 public final class DefaultPatternFlatteningService: PatternFlatteningService {
-    
+
     private let logger = Logger(label: "com.covercraft.flattening")
     private let validator = PatternValidator()
-    
+
+    /// Thread-safe cache for flattened panels
+    private let cache = FlatteningCache()
+
     public init() {
-        logger.info("Pattern Flattening Service initialized")
+        logger.info("Pattern Flattening Service initialized with caching enabled")
+    }
+
+    /// Clears the flattening cache
+    public func clearCache() async {
+        await cache.clear()
+        logger.info("Flattening cache cleared")
+    }
+
+    /// Returns cache statistics
+    public func getCacheStatistics() async -> (hits: Int, misses: Int, hitRate: Double) {
+        await cache.statistics
     }
     
     public func flattenPanels(_ panels: [PanelDTO], from mesh: MeshDTO) async throws -> [FlattenedPanelDTO] {
@@ -165,8 +229,14 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     }
     
     private func flattenSinglePanel(_ panel: PanelDTO, from mesh: MeshDTO) async throws -> FlattenedPanelDTO {
+        // Check cache first
+        if let cached = await cache.get(panelId: panel.id, meshId: mesh.id) {
+            logger.debug("Cache hit for panel \(panel.id)")
+            return cached
+        }
+
         logger.info("Starting LSCM flattening for panel \(panel.id)")
-        
+
         // Extract triangulated mesh data for this panel
         let meshData = try extractPanelMesh(panel, from: mesh)
         guard meshData.vertices.count >= 3 else {
@@ -211,14 +281,20 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         )
         
         logger.info("LSCM flattening completed for panel \(panel.id)")
-        
-        return FlattenedPanelDTO(
+
+        let flattenedPanel = FlattenedPanelDTO(
             points2D: scaledPoints,
             edges: edges,
             color: panel.color,
             scaleUnitsPerMeter: 1000.0, // 1000 units per meter for precision
             originalPanelId: panel.id
         )
+
+        // Store in cache for future use
+        await cache.set(flattenedPanel, panelId: panel.id, meshId: mesh.id)
+        logger.debug("Cached flattened panel \(panel.id)")
+
+        return flattenedPanel
     }
     
     // MARK: - LSCM Implementation Helper Methods
