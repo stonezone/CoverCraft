@@ -32,7 +32,7 @@ public final class ARScanViewController: UIViewController {
     private var anchorInsertionOrder: [UUID] = []  // Track insertion order for FIFO pruning
 
     // Memory management - limit anchor count to prevent unbounded growth
-    private let maxAnchorCount: Int = 150
+    private var maxAnchorCount: Int { Configuration.current.maxAnchorCount }
 
     // Depth limiting - default 2 meters, range 0.3m to 5m
     private var maxDepth: Float = 2.0
@@ -187,22 +187,26 @@ public final class ARScanViewController: UIViewController {
 
     /// Calculate and update the scan quality indicator based on mesh metrics
     private func updateQualityIndicator(vertices: Int, triangles: Int, anchors: Int) {
-        // Quality thresholds based on typical scan metrics
-        // Poor: < 5000 vertices, Fair: 5000-20000, Good: 20000-50000, Excellent: > 50000
+        // Quality thresholds from configuration
+        let config = Configuration.current.scanQuality
+        let poor = config.poorVertexThreshold
+        let fair = config.fairVertexThreshold
+        let good = config.goodVertexThreshold
+
         let vertexScore: Float
         switch vertices {
-        case 0..<5000: vertexScore = Float(vertices) / 5000.0 * 0.25
-        case 5000..<20000: vertexScore = 0.25 + Float(vertices - 5000) / 15000.0 * 0.25
-        case 20000..<50000: vertexScore = 0.5 + Float(vertices - 20000) / 30000.0 * 0.25
-        default: vertexScore = 0.75 + min(Float(vertices - 50000) / 50000.0, 1.0) * 0.25
+        case 0..<poor: vertexScore = Float(vertices) / Float(poor) * 0.25
+        case poor..<fair: vertexScore = 0.25 + Float(vertices - poor) / Float(fair - poor) * 0.25
+        case fair..<good: vertexScore = 0.5 + Float(vertices - fair) / Float(good - fair) * 0.25
+        default: vertexScore = 0.75 + min(Float(vertices - good) / Float(good), 1.0) * 0.25
         }
 
         // Also factor in triangle count and anchor coverage
-        let triangleScore: Float = min(Float(triangles) / 100000.0, 1.0)
-        let anchorScore: Float = min(Float(anchors) / 50.0, 1.0)
+        let triangleScore: Float = min(Float(triangles) / Float(config.maxTrianglesForScore), 1.0)
+        let anchorScore: Float = min(Float(anchors) / Float(config.maxAnchorsForScore), 1.0)
 
-        // Weighted average: vertices most important, then triangles, then anchors
-        let quality = vertexScore * 0.5 + triangleScore * 0.3 + anchorScore * 0.2
+        // Weighted average from configuration
+        let quality = vertexScore * config.vertexWeight + triangleScore * config.triangleWeight + anchorScore * config.anchorWeight
 
         // Update UI
         qualityProgressView.setProgress(quality, animated: true)
