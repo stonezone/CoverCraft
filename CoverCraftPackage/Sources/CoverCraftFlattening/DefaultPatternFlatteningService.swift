@@ -22,46 +22,67 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     
     public func flattenPanels(_ panels: [PanelDTO], from mesh: MeshDTO) async throws -> [FlattenedPanelDTO] {
         logger.info("Starting pattern flattening for \(panels.count) panels")
-        
+
         guard mesh.isValid else {
             throw FlatteningError.invalidPanel("Source mesh is invalid")
         }
-        
-        var flattenedPanels: [FlattenedPanelDTO] = []
-        
-        for panel in panels {
-            guard panel.isValid else {
+
+        // Filter valid panels first
+        let validPanels = panels.filter { panel in
+            if !panel.isValid {
                 logger.warning("Skipping invalid panel: \(panel.id)")
-                continue
+                return false
             }
-            
-            let flattenedPanel = try await flattenSinglePanel(panel, from: mesh)
-            
-            // Validate the flattened panel
+            return true
+        }
+
+        // Flatten panels in parallel using TaskGroup
+        let flattenedResults = try await withThrowingTaskGroup(
+            of: (index: Int, panel: FlattenedPanelDTO).self,
+            returning: [FlattenedPanelDTO].self
+        ) { group in
+            for (index, panel) in validPanels.enumerated() {
+                group.addTask {
+                    let flattenedPanel = try await self.flattenSinglePanel(panel, from: mesh)
+                    return (index: index, panel: flattenedPanel)
+                }
+            }
+
+            // Collect results maintaining original order
+            var results: [(index: Int, panel: FlattenedPanelDTO)] = []
+            for try await result in group {
+                results.append(result)
+            }
+            return results.sorted { $0.index < $1.index }.map { $0.panel }
+        }
+
+        // Validate panels sequentially (validation may have shared state)
+        var flattenedPanels: [FlattenedPanelDTO] = []
+        for flattenedPanel in flattenedResults {
             let validationResult = await validator.validatePanel(flattenedPanel)
-            
+
             // Log validation results
             if !validationResult.issues.isEmpty {
-                logger.warning("Panel \(panel.id) has \(validationResult.issues.count) validation issues")
+                logger.warning("Panel \(flattenedPanel.id) has \(validationResult.issues.count) validation issues")
                 for issue in validationResult.issues {
                     logger.warning("  - \(issue.severity): \(issue.message)")
                 }
             }
-            
+
             if !validationResult.warnings.isEmpty {
-                logger.info("Panel \(panel.id) has \(validationResult.warnings.count) warnings")
+                logger.info("Panel \(flattenedPanel.id) has \(validationResult.warnings.count) warnings")
                 for warning in validationResult.warnings {
                     logger.info("  - \(warning.message)")
                 }
             }
-            
+
             // Only include panels that pass critical validation
             let criticalIssues = validationResult.issues.filter { $0.severity == .critical }
             if criticalIssues.isEmpty {
                 flattenedPanels.append(flattenedPanel)
-                logger.info("Panel \(panel.id) passed validation and added to results")
+                logger.info("Panel \(flattenedPanel.id) passed validation and added to results")
             } else {
-                logger.error("Panel \(panel.id) failed critical validation and was excluded")
+                logger.error("Panel \(flattenedPanel.id) failed critical validation and was excluded")
                 for issue in criticalIssues {
                     logger.error("  - Critical: \(issue.message)")
                 }
