@@ -38,28 +38,97 @@ import PDFKit
 ///
 @available(iOS 18.0, macOS 15.0, *)
 public final class DefaultPatternExportService: PatternExportService {
-    
+
     private let logger = Logger(label: "com.covercraft.export")
-    
+
+    /// Maximum retry attempts for transient failures
+    private let maxRetries = 3
+
+    /// Base delay between retries (exponential backoff)
+    private let baseRetryDelay: UInt64 = 100_000_000 // 100ms
+
     public init() {
         logger.info("Pattern Export Service initialized")
     }
-    
+
+    /// Executes an operation with retry logic for transient failures
+    private func withRetry<T>(
+        operation: String,
+        action: () async throws -> T
+    ) async throws -> T {
+        var lastError: Error?
+
+        for attempt in 1...maxRetries {
+            do {
+                return try await action()
+            } catch let error as ExportError {
+                // ExportError cases are terminal failures from our own logic - don't retry
+                switch error {
+                case .invalidFormat, .corruptedData, .unsupportedFeature,
+                     .fileTooLarge, .permissionDenied, .diskSpaceExhausted,
+                     .exportFailed:
+                    throw error
+                }
+            } catch {
+                lastError = error
+                logger.warning("Attempt \(attempt)/\(maxRetries) failed for \(operation): \(error.localizedDescription)")
+
+                if attempt < maxRetries {
+                    let delay = baseRetryDelay * UInt64(1 << (attempt - 1))
+                    try await Task.sleep(nanoseconds: delay)
+                }
+            }
+        }
+
+        throw lastError ?? ExportError.exportFailed("Unknown error after \(maxRetries) retries")
+    }
+
+    /// Saves export data to a file with retry logic
+    /// - Parameters:
+    ///   - result: The export result containing data and filename
+    ///   - directory: The directory to save to (defaults to Documents/CoverCraft Patterns)
+    /// - Returns: The URL where the file was saved
+    public func saveExportResult(
+        _ result: ExportResult,
+        to directory: URL? = nil
+    ) async throws -> URL {
+        let targetDirectory = directory ?? {
+            let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            return documentsURL.appendingPathComponent("CoverCraft Patterns", isDirectory: true)
+        }()
+
+        return try await withRetry(operation: "save export file") {
+            // Ensure directory exists
+            try FileManager.default.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
+
+            let fileURL = targetDirectory.appendingPathComponent(result.filename)
+
+            // Write with atomic option for data integrity
+            try result.data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+
+            logger.info("Exported file saved to: \(fileURL.path)")
+            return fileURL
+        }
+    }
+
     public func exportPatterns(_ panels: [FlattenedPanelDTO], format: ExportFormat, options: ExportOptions) async throws -> ExportResult {
         logger.info("Starting pattern export to \(format.rawValue) format")
-        
+
         guard !panels.isEmpty else {
             throw ExportError.exportFailed("No panels to export")
         }
-        
-        // Validate all panels
+
+        // Validate all panels upfront (don't retry validation failures)
         for panel in panels {
             guard panel.isValid else {
                 throw ExportError.corruptedData
             }
         }
-        
-        let data = try await generateExportData(panels: panels, format: format, options: options)
+
+        // Generate export data with retry for transient failures
+        let data = try await withRetry(operation: "export data generation") {
+            try await generateExportData(panels: panels, format: format, options: options)
+        }
         let filename = generateFilename(format: format)
         
         let result = ExportResult(
