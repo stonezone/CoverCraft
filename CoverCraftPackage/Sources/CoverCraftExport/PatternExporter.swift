@@ -491,7 +491,7 @@ public actor PatternExporter {
     // MARK: - Utility Functions
     
     private func scalePointsForPrint(_ points: [CGPoint], dpi: CGFloat) -> [CGPoint] {
-        let scale = dpi / 72.0 // Convert to points (72 points per inch)
+        let scale = dpi / 25.4 // mm -> print points (25.4 mm per inch)
         return points.map { CGPoint(x: $0.x * scale, y: $0.y * scale) }
     }
     
