@@ -934,9 +934,7 @@ public final class DefaultPatternExportService: PatternExportService {
     #endif
     
     private func generateGIF(panels: [FlattenedPanelDTO], options: ExportOptions) async throws -> Data {
-        // Placeholder GIF generation
-        let placeholder = "GIF data would be generated here"
-        return placeholder.data(using: .utf8)!
+        throw ExportError.unsupportedFeature("GIF export not supported")
     }
     
     private func generateSVGPath(for panel: FlattenedPanelDTO) -> String {
@@ -1014,42 +1012,63 @@ public final class DefaultPatternExportService: PatternExportService {
         // `points` are in millimeters. The caller's CGContext/SVG viewBox handles units.
         let seamWidth = CGFloat(width)
 
+        // Compute signed area (shoelace) to determine winding. CCW -> outward normal is (-v.y, v.x).
+        // Flip sign for CW polygons so the offset is always outward.
+        var signedArea: CGFloat = 0
+        for i in 0..<points.count {
+            let p = points[i]
+            let q = points[(i + 1) % points.count]
+            signedArea += (q.x - p.x) * (q.y + p.y)
+        }
+        let sign: CGFloat = signedArea < 0 ? -1 : 1
+
         var offsetPoints: [CGPoint] = []
         offsetPoints.reserveCapacity(points.count)
 
+        let miterLimit: CGFloat = 4.0
+
         for i in 0..<points.count {
+            let prevPoint = points[(i - 1 + points.count) % points.count]
             let currentPoint = points[i]
             let nextPoint = points[(i + 1) % points.count]
-            let prevPoint = points[(i - 1 + points.count) % points.count]
 
-            // Calculate perpendicular offset direction
             let v1 = CGPoint(x: currentPoint.x - prevPoint.x, y: currentPoint.y - prevPoint.y)
             let v2 = CGPoint(x: nextPoint.x - currentPoint.x, y: nextPoint.y - currentPoint.y)
 
-            // Normalize and average the directions
             let l1 = sqrt(v1.x * v1.x + v1.y * v1.y)
             let l2 = sqrt(v2.x * v2.x + v2.y * v2.y)
 
-            if l1 > 0 && l2 > 0 {
-                let n1 = CGPoint(x: -v1.y / l1, y: v1.x / l1) // Perpendicular to v1
-                let n2 = CGPoint(x: -v2.y / l2, y: v2.x / l2) // Perpendicular to v2
-
-                let avgNormal = CGPoint(x: (n1.x + n2.x) / 2, y: (n1.y + n2.y) / 2)
-                let normalLength = sqrt(avgNormal.x * avgNormal.x + avgNormal.y * avgNormal.y)
-
-                if normalLength > 0 {
-                    let unitNormal = CGPoint(x: avgNormal.x / normalLength, y: avgNormal.y / normalLength)
-                    let offsetPoint = CGPoint(
-                        x: currentPoint.x + unitNormal.x * seamWidth,
-                        y: currentPoint.y + unitNormal.y * seamWidth
-                    )
-                    offsetPoints.append(offsetPoint)
-                } else {
-                    offsetPoints.append(currentPoint)
-                }
-            } else {
+            guard l1 > 0, l2 > 0 else {
                 offsetPoints.append(currentPoint)
+                continue
             }
+
+            // Outward unit normals on each edge, corrected for winding.
+            let n1 = CGPoint(x: sign * -v1.y / l1, y: sign * v1.x / l1)
+            let n2 = CGPoint(x: sign * -v2.y / l2, y: sign * v2.x / l2)
+
+            // Miter bisector = normalize(n1 + n2); miter length = seamWidth / dot(b, n1).
+            let bRaw = CGPoint(x: n1.x + n2.x, y: n1.y + n2.y)
+            let bLen = sqrt(bRaw.x * bRaw.x + bRaw.y * bRaw.y)
+            guard bLen > 0 else {
+                offsetPoints.append(currentPoint)
+                continue
+            }
+            let b = CGPoint(x: bRaw.x / bLen, y: bRaw.y / bLen)
+            let dot = b.x * n1.x + b.y * n1.y
+
+            // Clip miter on sharp/reflex angles to prevent spikes; fall back to beveled length.
+            let miterLen: CGFloat
+            if dot < 0.25 {
+                miterLen = seamWidth
+            } else {
+                miterLen = min(seamWidth / dot, seamWidth * miterLimit)
+            }
+
+            offsetPoints.append(CGPoint(
+                x: currentPoint.x + b.x * miterLen,
+                y: currentPoint.y + b.y * miterLen
+            ))
         }
 
         return offsetPoints
