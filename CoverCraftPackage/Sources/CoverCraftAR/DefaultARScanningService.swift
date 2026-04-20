@@ -33,7 +33,11 @@ public final class DefaultARScanningService: ARScanningService {
     
     public func startScanning() async throws {
         logger.info("Starting AR scanning session")
-        
+
+        guard #available(iOS 18.0, macOS 15.0, *) else {
+            throw ARScanningError.deviceNotSupported
+        }
+
         guard isARAvailable() else {
             throw ARScanningError.deviceNotSupported
         }
@@ -130,75 +134,90 @@ public final class DefaultARScanningService: ARScanningService {
     
     // MARK: - Private Methods
     
+    /// Immutable snapshot of an ARMeshAnchor's geometry buffers, safe to read off the ARKit thread.
+    private struct AnchorSnapshot: Sendable {
+        let transform: simd_float4x4
+        let vertexData: Data
+        let vertexStride: Int
+        let vertexOffset: Int
+        let vertexCount: Int
+        let faceData: Data
+        let faceCount: Int
+        let bytesPerIndex: Int
+        let indicesPerFace: Int
+    }
+
     private func combineMeshAnchors(_ anchors: [ARMeshAnchor]) async throws -> MeshDTO {
-        try await withCheckedThrowingContinuation { continuation in
+        // Snapshot ARKit-owned buffers on the caller thread before dispatching; reading
+        // `anchor.geometry.*.buffer.contents()` concurrently with ARKit's writer is a data race.
+        let snapshots: [AnchorSnapshot] = anchors.map { anchor in
+            let g = anchor.geometry
+            let v = g.vertices
+            let f = g.faces
+            let vData = Data(bytes: v.buffer.contents(), count: v.buffer.length)
+            let fData = Data(bytes: f.buffer.contents(), count: f.buffer.length)
+            return AnchorSnapshot(
+                transform: anchor.transform,
+                vertexData: vData,
+                vertexStride: v.stride,
+                vertexOffset: v.offset,
+                vertexCount: v.count,
+                faceData: fData,
+                faceCount: f.count,
+                bytesPerIndex: f.bytesPerIndex,
+                indicesPerFace: f.indexCountPerPrimitive
+            )
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 var allVertices: [SIMD3<Float>] = []
                 var allTriangleIndices: [Int] = []
                 var vertexOffset = 0
-                
-                for anchor in anchors {
-                    let meshGeometry = anchor.geometry
-                    
-                    // Extract vertices
-                    let vertices = meshGeometry.vertices
-                    let vertexBuffer = vertices.buffer.contents()
-                    let vertexStride = vertices.stride
-                    let vertexDataOffset = vertices.offset
-                    let vertexCount = vertices.count
-                    
-                    for i in 0..<vertexCount {
-                        let offset = vertexDataOffset + (i * vertexStride)
-                        let vertex = vertexBuffer
-                            .advanced(by: offset)
-                            .assumingMemoryBound(to: SIMD3<Float>.self)
-                            .pointee
-                        
-                        // Transform vertex by anchor transform
-                        let worldVertex4 = anchor.transform * SIMD4<Float>(vertex, 1.0)
-                        let worldVertex = SIMD3<Float>(worldVertex4.x, worldVertex4.y, worldVertex4.z)
-                        allVertices.append(worldVertex)
-                    }
-                    
-                    // Extract triangle indices
-                    let faces = meshGeometry.faces
-                    let faceBuffer = faces.buffer.contents()
-                    let faceCount = faces.count
-                    let bytesPerIndex = faces.bytesPerIndex
-                    let indicesPerFace = faces.indexCountPerPrimitive
 
-                    guard indicesPerFace == 3 else {
-                        continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported face primitive size: \(indicesPerFace)"))
+                for snap in snapshots {
+                    guard snap.indicesPerFace == 3 else {
+                        continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported face primitive size: \(snap.indicesPerFace)"))
                         return
                     }
-                    
-                    for i in 0..<faceCount {
-                        let offset = i * indicesPerFace * bytesPerIndex
-                        
-                        switch bytesPerIndex {
-                        case 2:
-                            let indexPtr = faceBuffer
-                                .advanced(by: offset)
-                                .assumingMemoryBound(to: UInt16.self)
-                            let i0 = Int(indexPtr[0]) + vertexOffset
-                            let i1 = Int(indexPtr[1]) + vertexOffset
-                            let i2 = Int(indexPtr[2]) + vertexOffset
-                            allTriangleIndices.append(contentsOf: [i0, i1, i2])
-                        case 4:
-                            let indexPtr = faceBuffer
-                                .advanced(by: offset)
-                                .assumingMemoryBound(to: UInt32.self)
-                            let i0 = Int(indexPtr[0]) + vertexOffset
-                            let i1 = Int(indexPtr[1]) + vertexOffset
-                            let i2 = Int(indexPtr[2]) + vertexOffset
-                            allTriangleIndices.append(contentsOf: [i0, i1, i2])
-                        default:
-                            continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported index size: \(bytesPerIndex) bytes"))
-                            return
+                    guard snap.bytesPerIndex == 2 || snap.bytesPerIndex == 4 else {
+                        continuation.resume(throwing: ARScanningError.meshGenerationFailed("Unsupported index size: \(snap.bytesPerIndex) bytes"))
+                        return
+                    }
+
+                    snap.vertexData.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                        guard let base = raw.baseAddress else { return }
+                        for i in 0..<snap.vertexCount {
+                            let offset = snap.vertexOffset + (i * snap.vertexStride)
+                            let vertex = base.advanced(by: offset)
+                                .assumingMemoryBound(to: SIMD3<Float>.self)
+                                .pointee
+                            let worldVertex4 = snap.transform * SIMD4<Float>(vertex, 1.0)
+                            allVertices.append(SIMD3<Float>(worldVertex4.x, worldVertex4.y, worldVertex4.z))
                         }
                     }
-                    
-                    vertexOffset += vertexCount
+
+                    snap.faceData.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                        guard let base = raw.baseAddress else { return }
+                        for i in 0..<snap.faceCount {
+                            let offset = i * snap.indicesPerFace * snap.bytesPerIndex
+                            if snap.bytesPerIndex == 2 {
+                                let indexPtr = base.advanced(by: offset)
+                                    .assumingMemoryBound(to: UInt16.self)
+                                allTriangleIndices.append(Int(indexPtr[0]) + vertexOffset)
+                                allTriangleIndices.append(Int(indexPtr[1]) + vertexOffset)
+                                allTriangleIndices.append(Int(indexPtr[2]) + vertexOffset)
+                            } else {
+                                let indexPtr = base.advanced(by: offset)
+                                    .assumingMemoryBound(to: UInt32.self)
+                                allTriangleIndices.append(Int(indexPtr[0]) + vertexOffset)
+                                allTriangleIndices.append(Int(indexPtr[1]) + vertexOffset)
+                                allTriangleIndices.append(Int(indexPtr[2]) + vertexOffset)
+                            }
+                        }
+                    }
+
+                    vertexOffset += snap.vertexCount
                 }
                 
                 guard !allVertices.isEmpty && !allTriangleIndices.isEmpty else {
