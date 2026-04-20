@@ -7,6 +7,15 @@ import Logging
 import CoverCraftCore
 import CoverCraftDTO
 
+/// Deterministic RNG seeded from mesh.id so same mesh produces same segmentation
+private struct SeededRNG: RandomNumberGenerator {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return state
+    }
+}
+
 /// Default implementation of mesh segmentation service using K-means clustering
 /// Enhanced implementation of mesh segmentation service using sophisticated K-means clustering
 @available(iOS 18.0, macOS 15.0, *)
@@ -87,10 +96,14 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
             logger.warning("Large mesh detected (\(mesh.triangleCount) triangles), may require significant memory")
         }
         
+        // Seed RNG from mesh.id so same mesh produces identical segmentation
+        var rng = SeededRNG(state: UInt64(truncatingIfNeeded: mesh.id.hashValue) | 1)
+
         let panels = try await performEnhancedSegmentation(
-            mesh: mesh, 
+            mesh: mesh,
             targetCount: targetPanelCount,
-            startTime: startTime
+            startTime: startTime,
+            rng: &rng
         )
 
         try Task.checkCancellation()
@@ -129,9 +142,10 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
     // MARK: - Enhanced Segmentation Pipeline
     
     private func performEnhancedSegmentation(
-        mesh: MeshDTO, 
+        mesh: MeshDTO,
         targetCount: Int,
-        startTime: Double
+        startTime: Double,
+        rng: inout SeededRNG
     ) async throws -> [PanelDTO] {
         
         let triangleCount = mesh.triangleCount
@@ -156,8 +170,9 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
         
         // Step 3: K-means++ initialization
         let initialCenters = try kMeansPlusPlusInitialization(
-            features: triangleFeatures, 
-            k: actualK
+            features: triangleFeatures,
+            k: actualK,
+            rng: &rng
         )
         try checkTimeout(startTime: startTime)
         
@@ -514,8 +529,9 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
     // MARK: - Phase 3: Sophisticated K-means++ Initialization
     
     private func kMeansPlusPlusInitialization(
-        features: [VertexFeatures], 
-        k: Int
+        features: [VertexFeatures],
+        k: Int,
+        rng: inout SeededRNG
     ) throws -> [VertexFeatures] {
         
         guard !features.isEmpty else {
@@ -529,8 +545,8 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
         var centers: [VertexFeatures] = []
         centers.reserveCapacity(k)
         
-        // Choose first center randomly
-        let firstIndex = Int.random(in: 0..<features.count)
+        // Choose first center randomly (seeded)
+        let firstIndex = Int.random(in: 0..<features.count, using: &rng)
         centers.append(features[firstIndex])
         
         logger.debug("K-means++: Selected initial center from triangle \(firstIndex)")
@@ -561,15 +577,15 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
                     }
                 )
                 
-                if let randomIndex = availableIndices.randomElement() {
+                if let randomIndex = availableIndices.randomElement(using: &rng) {
                     centers.append(features[randomIndex])
                 } else {
-                    centers.append(features[Int.random(in: 0..<features.count)])
+                    centers.append(features[Int.random(in: 0..<features.count, using: &rng)])
                 }
                 continue
             }
-            
-            let randomValue = Double.random(in: 0..<totalDistance)
+
+            let randomValue = Double.random(in: 0..<totalDistance, using: &rng)
             var cumulativeDistance: Double = 0
             var selectedIndex = 0
             
@@ -879,7 +895,11 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
         }
         
         // Return nearest cluster, or 0 if none found
-        return clusterDistances.min(by: { $0.value < $1.value })?.key ?? 0
+        if let nearest = clusterDistances.min(by: { $0.value < $1.value })?.key {
+            return nearest
+        }
+        logger.warning("Orphan component with no adjacent cluster; defaulting to cluster 0")
+        return 0
     }
     
     private func computeTriangleCentroidDistance(
