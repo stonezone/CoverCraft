@@ -37,7 +37,8 @@ private actor FlatteningCache {
         let key = CacheKey(panelId: panelId, meshId: meshId)
         cache[key] = panel
 
-        // Evict oldest entries if cache grows too large (simple LRU would be better)
+        // Evict entries if cache grows too large.
+        // NOTE: FIFO-ish eviction by arbitrary dictionary iteration order; not true LRU.
         if cache.count > 100 {
             let keysToRemove = Array(cache.keys.prefix(20))
             for key in keysToRemove {
@@ -235,7 +236,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             return cached
         }
 
-        logger.info("Starting LSCM flattening for panel \(panel.id)")
+        logger.info("Starting cotangent harmonic parameterization for panel \(panel.id)")
 
         // Extract triangulated mesh data for this panel
         let meshData = try extractPanelMesh(panel, from: mesh)
@@ -255,15 +256,15 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             throw FlatteningError.invalidPanel("Panel boundary has fewer than 3 vertices")
         }
         
-        // Set up LSCM sparse linear system
+        // Set up sparse linear system for cotangent harmonic parameterization
         let lscmSystem = try setupLSCMSystem(meshData, connectivity: connectivity, boundary: boundary)
-        
-        // Solve the linear system using Accelerate sparse solver
+
+        // Solve the linear system with a conjugate gradient solver
         let uvCoordinates = try solveLSCMSystem(lscmSystem)
-        
+
         // Guard against non-finite UV coordinates which would corrupt downstream geometry
         guard uvCoordinates.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else {
-            throw FlatteningError.flatteningFailed("Non-finite UV coordinates produced by LSCM solver")
+            throw FlatteningError.flatteningFailed("Non-finite UV coordinates produced by harmonic solver")
         }
         
         // Scale UV coordinates to real-world units and add seam allowances
@@ -280,7 +281,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             connectivity: connectivity
         )
         
-        logger.info("LSCM flattening completed for panel \(panel.id)")
+        logger.info("Cotangent harmonic parameterization completed for panel \(panel.id)")
 
         let flattenedPanel = FlattenedPanelDTO(
             points2D: scaledPoints,
@@ -297,7 +298,13 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return flattenedPanel
     }
     
-    // MARK: - LSCM Implementation Helper Methods
+    // MARK: - Cotangent Harmonic Parameterization Helper Methods
+    //
+    // NOTE: The surrounding internal symbol names (`setupLSCMSystem`, `solveLSCMSystem`,
+    // `LSCMSystem`) are retained for contract stability, but this implementation pins
+    // EVERY boundary vertex to the unit circle — that is the Tutte / cotangent harmonic
+    // scheme, not true Least Squares Conformal Maps (LSCM). Real LSCM pins only two
+    // boundary vertices and solves a complex-valued system.
     
     /// Extract mesh data specific to a panel
     private func extractPanelMesh(_ panel: PanelDTO, from mesh: MeshDTO) throws -> PanelMeshData {
@@ -385,7 +392,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
     }
     
     /// Validate that the panel mesh forms a single connected component.
-    /// Disconnected islands (often scanning noise) can cause LSCM to become unstable.
+    /// Disconnected islands (often scanning noise) can cause the harmonic solver to become unstable.
     private func validateSingleComponent(connectivity: MeshConnectivity) throws {
         guard let startVertex = connectivity.adjacency.keys.first else {
             throw FlatteningError.degenerateGeometry
@@ -425,28 +432,35 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             throw FlatteningError.degenerateGeometry
         }
         
-        // Trace boundary loop
+        // Trace boundary loop.
+        // Deterministic edge ordering: sort by (min, max) vertex index so iteration
+        // order is independent of Set's arbitrary hash ordering.
+        let sortedBoundaryEdges = boundaryEdges.sorted { lhs, rhs in
+            if lhs.v0 != rhs.v0 { return lhs.v0 < rhs.v0 }
+            return lhs.v1 < rhs.v1
+        }
+
         var boundary: [Int] = []
         var visited: Set<Edge> = Set()
-        
-        // Start with any boundary edge
-        guard let firstEdge = boundaryEdges.first else {
+
+        // Start with the first edge in the deterministic ordering.
+        guard let firstEdge = sortedBoundaryEdges.first else {
             throw FlatteningError.degenerateGeometry
         }
-        
+
         var currentVertex = firstEdge.v0
         boundary.append(currentVertex)
-        
+
         while true {
-            // Find next boundary edge from current vertex
+            // Find next boundary edge from current vertex (deterministic scan).
             var nextEdge: Edge?
-            for edge in boundaryEdges {
+            for edge in sortedBoundaryEdges {
                 if !visited.contains(edge) && edge.contains(currentVertex) {
                     nextEdge = edge
                     break
                 }
             }
-            
+
             guard let edge = nextEdge else { break }
 
             visited.insert(edge)
@@ -464,19 +478,20 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return boundary
     }
     
-    /// Set up LSCM sparse linear system
+    /// Set up the sparse linear system for cotangent harmonic parameterization.
+    /// (Name retained as `setupLSCMSystem` for contract stability — see module note.)
     private func setupLSCMSystem(_ meshData: PanelMeshData, connectivity: MeshConnectivity, boundary: [Int]) throws -> LSCMSystem {
         // Validate edge cases (Issue #9)
         guard meshData.vertices.count >= 3 else {
-            throw FlatteningError.invalidPanel("LSCM requires at least 3 vertices")
+            throw FlatteningError.invalidPanel("Harmonic parameterization requires at least 3 vertices")
         }
 
         guard boundary.count >= 3 else {
-            throw FlatteningError.invalidPanel("LSCM requires at least 3 boundary vertices")
+            throw FlatteningError.invalidPanel("Harmonic parameterization requires at least 3 boundary vertices")
         }
 
         guard meshData.triangles.count >= 1 else {
-            throw FlatteningError.invalidPanel("LSCM requires at least 1 triangle")
+            throw FlatteningError.invalidPanel("Harmonic parameterization requires at least 1 triangle")
         }
 
         let n = meshData.vertices.count
@@ -577,7 +592,8 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return max(cotangentSum * 0.5, 1e-6) // Clamp to avoid numerical issues
     }
     
-    /// Solve LSCM system using Accelerate sparse solver
+    /// Solve the harmonic parameterization system using a conjugate gradient solver.
+    /// (Name retained as `solveLSCMSystem` for contract stability — see module note.)
     private func solveLSCMSystem(_ system: LSCMSystem) throws -> [SIMD2<Double>] {
         let n = system.systemSize
         if n == 0 {
@@ -590,21 +606,6 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
             }
             return fullUVCoordinates
         }
-        
-        // Reserved for future sparse solver implementation
-        // These variables are prepared but not yet used until we integrate Accelerate's sparse solver
-        let _rowIndices = system.matrixEntries.map { Int32($0.0) }
-        let _colIndices = system.matrixEntries.map { Int32($0.1) }
-        let _values = system.matrixEntries.map { $0.2 }
-        let _solutionU = system.rhsU
-        let _info: Int32 = 0
-
-        // Suppress unused variable warnings
-        _ = _rowIndices
-        _ = _colIndices
-        _ = _values
-        _ = _solutionU
-        _ = _info
         
         // Use iterative solver for better performance with sparse matrices
         let maxIterations: Int32 = 1000
@@ -735,7 +736,11 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return x
     }
     
-    /// Scale UV coordinates to real-world units and add seam allowances
+    /// Scale UV coordinates to real-world units and emit the boundary polygon in mm.
+    ///
+    /// Downstream (`FlattenedPanelDTO.points2D`) expects an ordered *boundary* polygon,
+    /// not the full mesh vertex list. This method selects only the traced boundary
+    /// vertices, in cyclic order, and returns them as scaled CGPoints in millimeters.
     private func scaleAndAddSeamAllowances(
         uvCoordinates: [SIMD2<Double>],
         meshData: PanelMeshData,
@@ -744,14 +749,21 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         guard !uvCoordinates.isEmpty else {
             throw FlatteningError.flatteningFailed("Empty UV coordinates")
         }
-        
+        guard !boundary.isEmpty else {
+            throw FlatteningError.flatteningFailed("Empty boundary")
+        }
+
         // Calculate scaling factor from 3D to 2D
         let scaleFactor = try calculateScaleFactor(uvCoordinates: uvCoordinates, meshData: meshData)
-        
-        // Apply scaling and convert to CGPoint (millimeters)
-        let scaledPoints = uvCoordinates.map { uv in
-            CGPoint(
-                x: uv.x * scaleFactor * 1000.0, // Convert to millimeters
+
+        // Project ONLY the traced boundary vertices, in cyclic order, into mm.
+        let scaledPoints: [CGPoint] = try boundary.map { meshIndex in
+            guard meshIndex >= 0 && meshIndex < uvCoordinates.count else {
+                throw FlatteningError.flatteningFailed("Boundary index out of UV range")
+            }
+            let uv = uvCoordinates[meshIndex]
+            return CGPoint(
+                x: uv.x * scaleFactor * 1000.0, // mm
                 y: uv.y * scaleFactor * 1000.0
             )
         }
@@ -802,45 +814,52 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         return ratioSum / Double(ratioCount)
     }
     
-    /// Create edges for the flattened panel
+    /// Create edges for the flattened panel.
+    ///
+    /// Edge `startIndex`/`endIndex` are expressed in the trimmed boundary ordering
+    /// (`0..<boundary.count`) so they match `FlattenedPanelDTO.points2D`. The
+    /// `original3DLength` is still computed from the ORIGINAL mesh vertex positions
+    /// via the `boundary[i]` mapping, and returned in millimeters to match the 2D
+    /// coordinate units.
     private func createPanelEdges(
         boundary: [Int],
         meshData: PanelMeshData,
         connectivity: MeshConnectivity
     ) throws -> [EdgeDTO] {
         var edges: [EdgeDTO] = []
-        
-        // Add boundary edges as cut lines
+
+        // Add boundary edges as cut lines.
         for i in 0..<boundary.count {
-            let start = boundary[i]
-            let end = boundary[(i + 1) % boundary.count]
-            
-            guard start < meshData.vertices.count && end < meshData.vertices.count else { continue }
-            
-            let original3DLength = Double(simd_distance(meshData.vertices[start], meshData.vertices[end]))
-            
+            let nextI = (i + 1) % boundary.count
+            let startMesh = boundary[i]
+            let endMesh = boundary[nextI]
+
+            guard startMesh < meshData.vertices.count && endMesh < meshData.vertices.count else { continue }
+
+            // Original 3D length in meters → convert to mm so it matches points2D units.
+            let original3DLength = Double(simd_distance(meshData.vertices[startMesh], meshData.vertices[endMesh])) * 1000.0 // mm
+
             edges.append(EdgeDTO(
-                startIndex: start,
-                endIndex: end,
+                startIndex: i,
+                endIndex: nextI,
                 type: .cutLine,
                 original3DLength: original3DLength
             ))
         }
-        
-        // Add seam allowance edges
+
+        // Add seam allowance edges (width already in mm).
         let seamAllowanceWidth = 5.0 // 5mm
         for i in 0..<boundary.count {
-            let start = boundary[i]
-            let end = boundary[(i + 1) % boundary.count]
-            
+            let nextI = (i + 1) % boundary.count
+
             edges.append(EdgeDTO(
-                startIndex: start,
-                endIndex: end,
+                startIndex: i,
+                endIndex: nextI,
                 type: .seamAllowance,
                 original3DLength: seamAllowanceWidth
             ))
         }
-        
+
         return edges
     }
 }
@@ -892,7 +911,8 @@ private struct Edge: Hashable {
     }
 }
 
-/// LSCM linear system data
+/// Linear system data for cotangent harmonic parameterization.
+/// (Type name retained as `LSCMSystem` for contract stability.)
 private struct LSCMSystem {
     let matrixEntries: [(Int, Int, Double)]  // (row, col, value) triplets
     let rhsU: [Double]                      // Right-hand side for U coordinates
