@@ -65,9 +65,6 @@ public struct CoverCraftConfiguration: Sendable {
     /// Minimum edge length in millimeters
     public var minimumEdgeLengthMm: Double = 10.0
 
-    /// Maximum acceptable distortion factor
-    public var maximumDistortionFactor: Double = 1.5
-
     // MARK: - Export
 
     /// DPI settings for different export formats
