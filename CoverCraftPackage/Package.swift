@@ -113,10 +113,7 @@ let package = Package(
                 "CoverCraftExport",
                 "CoverCraftAR"
             ],
-            path: "Tests/TestUtilities",
-            exclude: [
-                "TestUtilitiesValidation.swift.disabled"
-            ]
+            path: "Tests/TestUtilities"
         ),
         
         // Test targets for each module
@@ -154,10 +151,6 @@ let package = Package(
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            exclude: [
-                "SegmentationServiceTests.swift.bak",
-                "MeshSegmentationTests.swift.bak"
-            ],
             resources: [.process("Fixtures")]
         ),
         .testTarget(
@@ -167,9 +160,6 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            exclude: [
-                "FlatteningServiceTests.swift.disabled"
             ],
             resources: [.process("Fixtures")]
         ),
@@ -200,12 +190,7 @@ let package = Package(
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            exclude: [
-                "CoverCraftFeatureTests.swift.disabled",
-                "MeshSegmentationServiceTests.swift.disabled",
-                "PatternFlattenerTests.swift.disabled",
-                "PatternExporterTests.swift.disabled"
-            ]
+
         ),
         
         // Integration and contract test targets
@@ -270,9 +255,7 @@ let package = Package(
                 "CoverCraftExport",
                 "TestUtilities"
             ],
-            exclude: [
-                "MemoryLeakTests.swift.disabled"
-            ]
+
         )
     ]
 )
