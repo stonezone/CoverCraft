@@ -16,9 +16,9 @@ let package = Package(
     ],
     dependencies: [
         // Testing dependencies
-        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.17.4"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.2"),
         // Logging infrastructure
-        .package(url: "https://github.com/apple/swift-log", exact: "1.6.1")
+        .package(url: "https://github.com/apple/swift-log", exact: "1.12.0")
     ],
     targets: [
         // DTO module - immutable data transfer objects (foundational, no dependencies)
