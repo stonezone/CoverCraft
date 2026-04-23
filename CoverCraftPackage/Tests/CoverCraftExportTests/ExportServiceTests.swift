@@ -343,6 +343,40 @@ struct ExportServiceTests {
             // Throwing is also acceptable behavior
         }
     }
+
+    @Test("Export with infinite scale throws")
+    func exportWithInfiniteScaleThrows() async {
+        let panels = TestDataFactory.createTestFlattenedPanels(count: 1)
+        let invalidOptions = ExportOptions(
+            includeSeamAllowance: false,
+            seamAllowanceWidth: 0,
+            includeRegistrationMarks: false,
+            paperSize: .a4,
+            scale: .infinity,
+            includeInstructions: false
+        )
+
+        await #expect(throws: ExportError.self) {
+            _ = try await service.exportPatterns(panels, format: .svg, options: invalidOptions)
+        }
+    }
+
+    @Test("Export with NaN seam allowance throws")
+    func exportWithNaNSeamAllowanceThrows() async {
+        let panels = TestDataFactory.createTestFlattenedPanels(count: 1)
+        let invalidOptions = ExportOptions(
+            includeSeamAllowance: true,
+            seamAllowanceWidth: .nan,
+            includeRegistrationMarks: false,
+            paperSize: .a4,
+            scale: 1.0,
+            includeInstructions: false
+        )
+
+        await #expect(throws: ExportError.self) {
+            _ = try await service.exportPatterns(panels, format: .svg, options: invalidOptions)
+        }
+    }
     
     // MARK: - Supported Formats Tests
 

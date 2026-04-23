@@ -11,6 +11,8 @@ import CoverCraftExport
 @MainActor
 struct CoverCraftApp: App {
     init() {
+        Self.resetUITestExportsIfRequested()
+
         LoggingSystem.bootstrap { label in
             StreamLogHandler.standardOutput(label: label)
         }
@@ -30,5 +32,15 @@ struct CoverCraftApp: App {
             ContentView()
                 .environment(\.dependencyContainer, DefaultDependencyContainer.shared)
         }
+    }
+
+    private static func resetUITestExportsIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("UITEST_RESET_EXPORTS") else {
+            return
+        }
+
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let patternsFolder = documentsURL.appendingPathComponent("CoverCraft Patterns", isDirectory: true)
+        try? FileManager.default.removeItem(at: patternsFolder)
     }
 }

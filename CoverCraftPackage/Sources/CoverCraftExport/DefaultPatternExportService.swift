@@ -118,6 +118,8 @@ public final class DefaultPatternExportService: PatternExportService {
             throw ExportError.exportFailed("No panels to export")
         }
 
+        try validateExportOptions(options)
+
         // Validate all panels upfront (don't retry validation failures)
         for panel in panels {
             guard panel.isValid else {
@@ -144,6 +146,16 @@ public final class DefaultPatternExportService: PatternExportService {
         
         logger.info("Pattern export completed: \(filename) (\(data.count) bytes)")
         return result
+    }
+
+    private func validateExportOptions(_ options: ExportOptions) throws {
+        guard options.scale.isFinite, options.scale > 0 else {
+            throw ExportError.exportFailed("Export scale must be a finite value greater than zero")
+        }
+
+        guard options.seamAllowanceWidth.isFinite, options.seamAllowanceWidth >= 0 else {
+            throw ExportError.exportFailed("Seam allowance width must be a finite value greater than or equal to zero")
+        }
     }
     
     public func getSupportedFormats() -> [ExportFormat] {

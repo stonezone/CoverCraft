@@ -283,6 +283,7 @@ public final class DefaultPatternFlatteningService: PatternFlatteningService {
         
         logger.info("Cotangent harmonic parameterization completed for panel \(panel.id)")
 
+        // Invariant: scaledPoints.count == boundary.count; EdgeDTO indices are 0..<boundary.count.
         let flattenedPanel = FlattenedPanelDTO(
             points2D: scaledPoints,
             edges: edges,

@@ -1,7 +1,5 @@
 import SwiftUI
 
-import SwiftUI
-
 @available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct HelpView: View {
@@ -19,7 +17,7 @@ public struct HelpView: View {
                             .font(.largeTitle)
                             .bold()
                         
-                        Text("Create custom sewing patterns from 3D scans")
+                        Text("Generate slipcover or fitted sewing patterns from a LiDAR scan or manual dimensions.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -27,14 +25,13 @@ public struct HelpView: View {
                     // Step 1
                     helpStep(
                         number: "1",
-                        title: "Scan Object",
-                        description: "Use your iPhone's LiDAR sensor to scan the object you want to create a cover for. Move slowly around the object for best results.",
+                        title: "Choose Input",
+                        description: "Use Manual Dimensions for rectangular furniture when you already know width, depth, and height. Use LiDAR Scan when you need scan-derived geometry.",
                         systemImage: "camera.viewfinder",
                         tips: [
-                            "Ensure good lighting",
-                            "Move slowly and steadily",
-                            "Capture all sides of the object",
-                            "Works best with objects 0.5m - 5m in size"
+                            "Manual Dimensions is the fastest path for slipcover patterns",
+                            "Fitted mode requires a LiDAR scan",
+                            "Dimensions are entered in millimeters"
                         ]
                     )
                     
@@ -43,14 +40,14 @@ public struct HelpView: View {
                     // Step 2
                     helpStep(
                         number: "2",
-                        title: "Set Scale",
-                        description: "Calibrate the real-world scale by selecting two points on the mesh and entering the actual distance between them.",
+                        title: "Capture or Enter Dimensions",
+                        description: "For scan mode, capture the object from multiple angles and calibrate the mesh. For manual mode, enter width, depth, and height directly.",
                         systemImage: "ruler",
                         tips: [
-                            "Choose two easily identifiable points",
-                            "Measure the distance accurately",
-                            "Use meters as the unit",
-                            "This ensures your pattern is the correct size"
+                            "Move slowly and keep the full silhouette in frame",
+                            "Use two clear points when calibrating a scan",
+                            "Manual mode skips calibration entirely",
+                            "Measure the widest real-world dimensions"
                         ]
                     )
                     
@@ -59,14 +56,14 @@ public struct HelpView: View {
                     // Step 3
                     helpStep(
                         number: "3",
-                        title: "Configure Panels",
-                        description: "Choose the resolution for your sewing pattern. Higher resolution creates more panels for better fit but increases complexity.",
+                        title: "Choose Pattern Type",
+                        description: "Slipcover mode is the stable path for boxy covers. Fitted mode uses experimental segmentation and may require retries.",
                         systemImage: "square.grid.3x3",
                         tips: [
-                            "Low (5 panels): Simple shapes",
-                            "Medium (8 panels): Most objects",
-                            "High (15 panels): Complex shapes",
-                            "Preview before generating"
+                            "Slipcover patterns are bottom-open and gravity-based",
+                            "Fitted mode is still experimental",
+                            "Higher fitted resolution creates more panels",
+                            "Check ease and seam allowance before generating"
                         ]
                     )
                     
@@ -75,14 +72,14 @@ public struct HelpView: View {
                     // Step 4
                     helpStep(
                         number: "4",
-                        title: "Export Pattern",
-                        description: "Generate and export your sewing pattern in various formats including PDF, PNG, or SVG.",
+                        title: "Generate and Export",
+                        description: "Generate the pattern, review the export screen, and save it as PDF, SVG, or PNG.",
                         systemImage: "square.and.arrow.up",
                         tips: [
-                            "PDF formats include crop marks",
-                            "Print at 100% scale",
-                            "SVG files are scalable",
-                            "PNG files are high resolution"
+                            "Exports are saved in Documents/CoverCraft Patterns",
+                            "PDF is best for printing at full scale",
+                            "SVG is best for downstream editing",
+                            "PNG is best for quick previews"
                         ]
                     )
                     
@@ -97,17 +94,17 @@ public struct HelpView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             requirementRow(
                                 icon: "iphone",
-                                text: "iPhone with LiDAR sensor (iPhone 12 Pro or later)"
+                                text: "LiDAR-capable iPhone or iPad only for scan workflows"
                             )
                             
                             requirementRow(
-                                icon: "light.max",
-                                text: "Good lighting conditions"
+                                icon: "square.3.layers.3d",
+                                text: "Manual mode works without a scan"
                             )
                             
                             requirementRow(
                                 icon: "ruler",
-                                text: "Ability to measure reference distances"
+                                text: "Tape measure or ruler for manual entry or scan calibration"
                             )
                             
                             requirementRow(
@@ -128,26 +125,26 @@ public struct HelpView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             tipRow(
                                 icon: "lightbulb",
-                                title: "Best Scanning Practice",
-                                description: "Scan in a well-lit environment and move slowly around the object in a spiral pattern."
+                                title: "Start With Slipcover",
+                                description: "Use slipcover mode first when you need a reliable pattern path."
                             )
                             
                             tipRow(
                                 icon: "ruler.fill",
-                                title: "Accurate Calibration",
-                                description: "Use a ruler or measuring tape to get precise measurements for calibration."
+                                title: "Measure Real Extents",
+                                description: "Manual mode works best when width, depth, and height reflect the outermost points of the object."
                             )
                             
                             tipRow(
                                 icon: "scissors",
-                                title: "Pattern Assembly",
-                                description: "Cut out each panel and add seam allowances when sewing your cover."
+                                title: "Check Export Scale",
+                                description: "Print PDF exports at 100% and verify the calibration bar before cutting fabric."
                             )
                             
                             tipRow(
                                 icon: "doc.text",
-                                title: "Save Your Work",
-                                description: "Export patterns in multiple formats to ensure you always have a backup."
+                                title: "Keep Exports",
+                                description: "Export to PDF and SVG if you want both print-ready output and editable geometry."
                             )
                         }
                     }

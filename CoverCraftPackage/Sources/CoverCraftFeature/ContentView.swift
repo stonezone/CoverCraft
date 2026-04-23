@@ -25,7 +25,7 @@ public struct ContentView: View {
     @State private var hapticService: HapticService?
     @State private var servicesResolved = false
 
-    @State private var appState = AppState()
+    @State private var appState = Self.makeInitialAppState()
     @State private var showingScanner = false
     @State private var showingHelp = false
     @State private var showingExportView = false
@@ -35,6 +35,16 @@ public struct ContentView: View {
     @State private var showFittedModeWarning = false
 
     public init() {}
+
+    private static func makeInitialAppState() -> AppState {
+        let state = AppState()
+
+        if ProcessInfo.processInfo.arguments.contains("UITEST_MANUAL_MODE") {
+            state.inputMode = .manual
+        }
+
+        return state
+    }
     
     // MARK: - Body
     
@@ -105,12 +115,14 @@ public struct ContentView: View {
                 }
             }
             .pickerStyle(.menu)
+            .accessibilityIdentifier("covercraft.inputModePicker")
 
             switch appState.inputMode {
             case .scan:
                 Button(action: { showingScanner = true }) {
                     Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
                 }
+                .accessibilityIdentifier("covercraft.startScanButton")
 
                 if let meshDTO = appState.currentMesh {
                     VStack(alignment: .leading, spacing: 8) {
@@ -225,6 +237,7 @@ public struct ContentView: View {
         } footer: {
             if appState.inputMode == .manual {
                 Text("Not required for Manual Dimensions.")
+                    .accessibilityIdentifier("covercraft.manualCalibrationNote")
             }
         }
     }
@@ -326,6 +339,7 @@ public struct ContentView: View {
                     Label("Generate Pattern", systemImage: "scissors")
                 }
             }
+            .accessibilityIdentifier("covercraft.generatePatternButton")
             .disabled(!appState.canGeneratePattern || isGeneratingPattern)
             
             if appState.flattenedPanels != nil {
@@ -334,6 +348,7 @@ public struct ContentView: View {
                 } label: {
                     Label("Export Pattern", systemImage: "square.and.arrow.up")
                 }
+                .accessibilityIdentifier("covercraft.exportPatternLink")
             }
         } header: {
             Text("4. Generate Pattern")

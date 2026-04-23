@@ -255,10 +255,9 @@ struct KnownIssuesTests {
             includeInstructions: false
         )
         
-        // Current behavior: export completes without error even with infinite scale
-        // TODO: Add finite-value validation for export options
-        let result = try? await exportService.exportPatterns(panels, format: testExportFormat, options: infiniteScaleOptions)
-        #expect(result != nil)
+        await #expect(throws: ExportError.self) {
+            _ = try await exportService.exportPatterns(panels, format: testExportFormat, options: infiniteScaleOptions)
+        }
     }
     
     // MARK: - Performance Regressions
