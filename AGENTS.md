@@ -33,4 +33,4 @@ Recent history uses Conventional-Commits-lite prefixes: `fix(ar): ...`, `test: .
 PRs should state scope, affected modules, and exact test evidence. Include screenshots for UI changes. Call out any new dependency, public API, DTO schema change, or `@unchecked Sendable` usage.
 
 ## Current Branch Note
-Historical remediation notes were archived under `docs/archive/2026-04-23-legacy-project-notes/`. Treat them as reference material only; verify current git status, package tests, and the full `CoverCraft.xctestplan` before making branch decisions.
+Keep the GitHub tree minimal. Historical handoffs, generated TODOs, old review dumps, local assistant state, and device build artifacts do not belong in the tracked repository. Verify current git status, package tests, and the full `CoverCraft.xctestplan` before branch or release decisions.

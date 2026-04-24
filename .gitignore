@@ -178,10 +178,8 @@ temp/
 /*_archive/
 /backup*/
 /Backup*/
-
-# Project history archives are intentionally tracked.
-!docs/archive/
-!docs/archive/**
+# Local history archives stay off GitHub. Promote only concise, current docs.
+/docs/archive/
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Legacy & Planning Documents
@@ -288,6 +286,11 @@ DEPENDENCIES.md
 /TODO_*.md
 /COMPLETE_TODO.md
 /CoverCraftPackage/CODE_REVIEW_FINDINGS.md
+/CoverCraft/.serena/
+/CoverCraft/.DS_Store
+/CoverCraftPackage/.DS_Store
+/CoverCraftPackage/Sources/.DS_Store
+/CoverCraftPackage/Tests/.DS_Store
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Markdown Files

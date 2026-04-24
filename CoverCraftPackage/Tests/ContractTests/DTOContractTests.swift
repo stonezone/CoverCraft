@@ -11,8 +11,6 @@ import simd
 
 /// Contract tests to ensure DTO serialization remains stable across versions
 /// These tests protect against breaking changes in the API
-/// Contract tests to ensure DTO serialization remains stable across versions
-/// These tests protect against breaking changes in the API
 @Suite("DTO Contract Tests")
 struct DTOContractTests {
     
@@ -28,6 +26,8 @@ struct DTOContractTests {
         
         let jsonData = try encoder.encode(mesh)
         let jsonString = String(data: jsonData, encoding: .utf8)!
+        #expect(jsonString.contains("\"vertices\""))
+        #expect(jsonString.contains("\"triangleIndices\""))
         
         // Ensure we can deserialize back
         let decoder = JSONDecoder()
@@ -94,6 +94,8 @@ struct DTOContractTests {
         
         let jsonData = try encoder.encode(panel)
         let jsonString = String(data: jsonData, encoding: .utf8)!
+        #expect(jsonString.contains("\"vertexIndices\""))
+        #expect(jsonString.contains("\"triangleIndices\""))
         
         // Verify round-trip serialization
         let decoder = JSONDecoder()

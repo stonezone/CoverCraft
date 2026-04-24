@@ -13,7 +13,6 @@
 		65C728362E5AEF9900EEDEFA /* CoverCraftExport in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728352E5AEF9900EEDEFA /* CoverCraftExport */; };
 		65C728382E5AEF9900EEDEFA /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 65C728372E5AEF9900EEDEFA /* CoverCraftFeature */; };
 		8B41F6832DEDD23B001A66F9 /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6822DEDD23B001A66F9 /* CoverCraftFeature */; };
-		8B41F6852DEDD25C001A66F9 /* CoverCraftFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6842DEDD25C001A66F9 /* CoverCraftFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +31,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8B0C1EA12F00000000000001 /* Exceptions for "CoverCraft" folder in "CoverCraft" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				.DS_Store,
+				.serena,
+				CoverCraft.xctestplan,
+			);
+			target = 8B41F6442DEDD0D5001A66F9 /* CoverCraft */;
+		};
 		8BD71C0A2DEE41E000CEDD92 /* Exceptions for "Config" folder in "CoverCraft" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -47,6 +55,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8B41F6472DEDD0D5001A66F9 /* CoverCraft */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8B0C1EA12F00000000000001 /* Exceptions for "CoverCraft" folder in "CoverCraft" target */,
+			);
 			path = CoverCraft;
 			sourceTree = "<group>";
 		};
@@ -73,7 +84,6 @@
 				65C728302E5AEF9900EEDEFA /* CoverCraftAR in Frameworks */,
 				65C728362E5AEF9900EEDEFA /* CoverCraftExport in Frameworks */,
 				65C728382E5AEF9900EEDEFA /* CoverCraftFeature in Frameworks */,
-				8B41F6852DEDD25C001A66F9 /* CoverCraftFeature in Frameworks */,
 				65C728322E5AEF9900EEDEFA /* CoverCraftCore in Frameworks */,
 				65C728342E5AEF9900EEDEFA /* CoverCraftDTO in Frameworks */,
 			);
@@ -138,7 +148,6 @@
 			);
 			name = CoverCraft;
 			packageProductDependencies = (
-				8B41F6842DEDD25C001A66F9 /* CoverCraftFeature */,
 				65C7282F2E5AEF9900EEDEFA /* CoverCraftAR */,
 				65C728312E5AEF9900EEDEFA /* CoverCraftCore */,
 				65C728332E5AEF9900EEDEFA /* CoverCraftDTO */,
@@ -559,10 +568,6 @@
 			productName = CoverCraftFeature;
 		};
 		8B41F6822DEDD23B001A66F9 /* CoverCraftFeature */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = CoverCraftFeature;
-		};
-		8B41F6842DEDD25C001A66F9 /* CoverCraftFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CoverCraftFeature;
 		};

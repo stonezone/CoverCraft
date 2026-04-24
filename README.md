@@ -11,7 +11,7 @@ CoverCraft/
 ├── CoverCraft/                          # App target (minimal)
 │   ├── Assets.xcassets/                # App-level assets (icons, colors)
 │   ├── CoverCraftApp.swift              # App entry point
-│   └── CoverCraft.xctestplan            # Test configuration
+│   └── CoverCraft.xctestplan            # Test configuration, excluded from app bundle
 ├── CoverCraftPackage/                   # Primary development area
 │   ├── Package.swift                    # Package configuration
 │   ├── Sources/                         # DTO/Core/AR/Segmentation/Flattening/Export/UI/Feature
@@ -45,7 +45,8 @@ Current modules:
 
 ### Buildable Folders (Xcode 16)
 - Files added to the filesystem automatically appear in Xcode
-- No need to manually add files to project targets
+- No need to manually add normal source files to project targets
+- Local assistant/cached files inside synchronized folders must be ignored and excluded from target membership
 - Reduces project file conflicts in teams
 
 ## Development Notes
@@ -123,7 +124,7 @@ To include assets in your feature package:
 
 ## Documentation
 
-For active project guidance, use `AGENTS.md`, `CLAUDE.md`, and inline source comments. Historical plans and review artifacts live under `docs/archive/`.
+Active project guidance lives in `AGENTS.md`, `CLAUDE.md`, this README, and inline source comments. Historical handoffs, review dumps, generated TODO lists, and assistant scratch files are intentionally kept out of the GitHub tree.
 
 ### Generated with XcodeBuildMCP
 This project was scaffolded using [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP), which provides tools for AI-assisted iOS development workflows.
