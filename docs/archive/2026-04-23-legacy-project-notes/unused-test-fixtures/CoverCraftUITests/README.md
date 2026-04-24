@@ -6,7 +6,7 @@ This directory contains test fixtures for the UI module, providing app state dat
 
 The UI fixtures provide:
 - **App State Management**: Complete application state scenarios
-- **Navigation Flows**: Multi-screen navigation patterns  
+- **Navigation Flows**: Multi-screen navigation patterns
 - **Scan State Data**: AR scanning workflow states
 - **Project Management**: Project listing and editing states
 - **Settings Configuration**: User preference scenarios
@@ -67,7 +67,7 @@ import SwiftUI
 
 @Test func appLaunchStateHandling() {
     let freshState = UIStateFixtures.freshLaunchState
-    
+
     #expect(freshState.isFirstLaunch == true)
     #expect(freshState.hasCompletedOnboarding == false)
     #expect(freshState.currentProject == nil)
@@ -79,7 +79,7 @@ import SwiftUI
 ```swift
 @Test func deepNavigationHandling() {
     let deepState = UIStateFixtures.deepNavigationState
-    
+
     #expect(deepState.navigationPath.count == 3)
     #expect(deepState.navigationPath.contains(.projects))
     #expect(deepState.currentProject != nil)
@@ -96,7 +96,7 @@ import SwiftUI
         UIStateFixtures.processingState,
         UIStateFixtures.completedScanState
     ]
-    
+
     for (index, state) in states.enumerated() {
         switch index {
         case 0: #expect(state.phase == .setup)
@@ -115,7 +115,7 @@ import SwiftUI
     let empty = UIStateFixtures.emptyProjectsState
     let populated = UIStateFixtures.populatedProjectsState
     let searching = UIStateFixtures.searchingProjectsState
-    
+
     #expect(empty.projects.isEmpty)
     #expect(populated.projects.count > 0)
     #expect(searching.searchText == "Shirt")
@@ -129,16 +129,16 @@ import SwiftUI
     let editing = UIStateFixtures.editingFrontPanelState
     let viewing = UIStateFixtures.viewOnlyPanelState
     let multiSelect = UIStateFixtures.multiSelectPanelState
-    
+
     // Editing state
     #expect(editing.isEditing == true)
     #expect(editing.selectedTool != .none)
     #expect(editing.showGrid == true)
-    
+
     // View-only state
     #expect(viewing.isEditing == false)
     #expect(viewing.selectedTool == .none)
-    
+
     // Multi-select state
     if case .multiplePoints(let indices) = multiSelect.selectionState {
         #expect(indices.count > 1)
@@ -153,12 +153,12 @@ import SwiftUI
 @Test func settingsConfiguration() {
     let defaults = UIStateFixtures.defaultSettingsState
     let custom = UIStateFixtures.customizedSettingsState
-    
+
     // Default settings
     #expect(defaults.theme == .system)
     #expect(defaults.units == .metric)
     #expect(defaults.enableHapticFeedback == true)
-    
+
     // Customized settings
     #expect(custom.theme == .dark)
     #expect(custom.units == .imperial)
@@ -173,17 +173,17 @@ import SwiftUI
     let iphone = UIStateFixtures.iphone15ProCapabilities
     let ipad = UIStateFixtures.iPadProCapabilities
     let se = UIStateFixtures.iphoneSECapabilities
-    
+
     // iPhone 15 Pro capabilities
     #expect(iphone.hasLiDAR == true)
     #expect(iphone.supportsARWorldTracking == true)
     #expect(iphone.supportsDynamicIsland == true)
-    
+
     // iPad Pro capabilities
     #expect(ipad.hasLiDAR == true)
     #expect(ipad.ramSize > iphone.ramSize)
     #expect(ipad.supportsDynamicIsland == false)
-    
+
     // iPhone SE limitations
     #expect(se.hasLiDAR == false)
     #expect(se.ramSize < iphone.ramSize)
@@ -195,10 +195,10 @@ import SwiftUI
 ```swift
 @Test func swiftUIViewStateTesting() {
     let scanState = UIStateFixtures.activeScanningState
-    
+
     // Create view with state
     let view = ScanView(state: scanState)
-    
+
     // Test view properties
     #expect(view.state.phase == .scanning)
     #expect(view.state.hasValidTracking == true)
@@ -243,7 +243,7 @@ Use complex fixtures:
 ```swift
 struct TestableView: View {
     let appState: AppState
-    
+
     var body: some View {
         ContentView()
             .environment(appState)
@@ -253,7 +253,7 @@ struct TestableView: View {
 @Test func viewWithInjectedState() {
     let state = UIStateFixtures.returningUserState
     let view = TestableView(appState: state)
-    
+
     // Test view behavior with specific state
 }
 ```
@@ -263,11 +263,11 @@ struct TestableView: View {
 @Test func navigationFlowTesting() {
     let initialState = UIStateFixtures.freshLaunchState
     var currentState = initialState
-    
+
     // Simulate navigation actions
     currentState = navigateToScan(from: currentState)
     #expect(currentState.selectedTab == .scan)
-    
+
     currentState = navigateToProjects(from: currentState)
     #expect(currentState.selectedTab == .projects)
 }
@@ -278,10 +278,10 @@ struct TestableView: View {
 @Test func themeHandling() {
     let lightState = UIStateFixtures.defaultSettingsState
     let darkState = UIStateFixtures.customizedSettingsState
-    
+
     #expect(lightState.theme == .system)
     #expect(darkState.theme == .dark)
-    
+
     // Test theme application
     let lightView = ThemedView(theme: lightState.theme)
     let darkView = ThemedView(theme: darkState.theme)
@@ -292,9 +292,9 @@ struct TestableView: View {
 ```swift
 @Test func errorStatePresentation() {
     let errorState = UIStateFixtures.errorState
-    
+
     #expect(errorState.error != nil)
-    
+
     if case .arNotSupported(let message) = errorState.error {
         #expect(!message.isEmpty)
         // Test error UI presentation
@@ -327,7 +327,7 @@ func transitionToScanning(from state: AppState) -> AppState {
 }
 
 func completeOnboarding(from state: AppState) -> AppState {
-    // Implementation  
+    // Implementation
 }
 
 func handleARError(_ error: AppError, in state: AppState) -> AppState {
@@ -391,7 +391,7 @@ measureTime {
 ```swift
 @Test func accessibilityStateHandling() {
     let settings = UIStateFixtures.defaultSettingsState
-    
+
     // Test accessibility-friendly settings
     let accessibleView = AccessibleView(settings: settings)
     // Validate accessibility labels, hints, etc.

@@ -26,6 +26,8 @@ DerivedData/
 *.dSYM
 *.xcresult
 *.trace
+*.xcactivitylog
+*.xcuserstate
 timeline.xctimeline
 playground.xcworkspace
 
@@ -40,6 +42,8 @@ CoverCraft.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 .swiftpm/
 .build/
 .index-build/
+.clang-module-cache/
+.modulecache/
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependency Managers
@@ -98,6 +102,8 @@ Temporary Items
 .cursor/
 .serena/
 .claude/
+.claude-os/
+agent-os/
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Environment & Secrets
@@ -167,24 +173,28 @@ temp/
 *.backup
 *.bak
 .dependency-backups/
-archive*/
-Archive*/
-*_archive/
-backup*/
-Backup*/
+/archive*/
+/Archive*/
+/*_archive/
+/backup*/
+/Backup*/
+
+# Project history archives are intentionally tracked.
+!docs/archive/
+!docs/archive/**
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Legacy & Planning Documents
 # ─────────────────────────────────────────────────────────────────────────────
 project summary.txt
-HANDOFF_*.md
-REWRITE.md
+/HANDOFF_*.md
+/REWRITE.md
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AI Instruction Files (project-specific prompts)
 # ─────────────────────────────────────────────────────────────────────────────
-*-prompt.md
-*-instructions.md
+/*-prompt.md
+/*-instructions.md
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Python (tooling support)
@@ -271,44 +281,25 @@ test_lscm
 PHASE_*_REPORT*.md
 QUALITY_METRICS_REPORT*.md
 covercraft-prompt.md
-covercraft-visualization-instructions.md
-HANDOFF_POLYCAM_CAPTURE.md
 DEPENDENCIES.md
+/.claude-session.md
+/HANDOFF*.md
+/REWRITE.md
+/TODO_*.md
+/COMPLETE_TODO.md
+/CoverCraftPackage/CODE_REVIEW_FINDINGS.md
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Markdown Files (selective tracking)
+# Markdown Files
 # ─────────────────────────────────────────────────────────────────────────────
-*.md
-
-# Exceptions - keep these tracked
-!README.md
-!CONTRIBUTING.md
-!CHANGELOG.md
-!CODE_OF_CONDUCT.md
-!SECURITY.md
-!SUPPORT.md
-!LICENSE.md
-!RELEASE_NOTES.md
-!ROADMAP.md
-!CLAUDE.md
-!ARCHITECTURE.md
-!API_VERSIONS.md
-!API_VERSIONING.md
-!DEPENDENCIES.md
-!docs/*.md
-!docs/**/*.md
-!src/README.md
-!/.github/ISSUE_TEMPLATE/*.md
-!/.github/PULL_REQUEST_TEMPLATE.md
-!/.github/CONTRIBUTING.md
-!/.github/SECURITY.md
-!/.github/SUPPORT.md
+# Track project documentation by default. Ignore only explicit local handoff,
+# report, and generated-planning files listed above.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Claude OS state files (don't commit these)
 # ─────────────────────────────────────────────────────────────────────────────
-.claude-os/
-agent-os/
+# State directories are covered in "AI Assistants"; session markdown is covered
+# in "Project-Specific".
 
 # Local dev caches / scratch
 CoverCraftPackage/.clang-module-cache/

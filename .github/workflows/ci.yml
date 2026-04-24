@@ -19,23 +19,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-
-      - name: Show Swift Version
-        run: swift --version
+      - name: Show Toolchain Versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Resolve Dependencies
-        working-directory: CoverCraftPackage
-        run: swift package resolve
+        run: swift package --package-path CoverCraftPackage resolve
 
       - name: Build Package
-        working-directory: CoverCraftPackage
-        run: swift build -c release
+        run: swift build --package-path CoverCraftPackage -c release
 
       - name: Run Tests
-        working-directory: CoverCraftPackage
-        run: swift test --parallel
+        run: swift test --package-path CoverCraftPackage --parallel
 
   build-ios:
     name: Build iOS App
@@ -45,33 +41,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+      - name: Show Xcode Version
+        run: xcodebuild -version
 
       - name: Build for iOS Simulator
-        run: |
-          xcodebuild build \
-            -project CoverCraft.xcodeproj \
-            -scheme CoverCraft \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || true
-
-  lint:
-    name: Swift Format Check
-    runs-on: macos-15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-
-      - name: Check Swift Format
-        working-directory: CoverCraftPackage
-        run: |
-          # Build but don't fail on format issues for now
-          swift build 2>&1 | head -50 || true
-          echo "Format check placeholder - add swift-format when ready"
+        run: xcodebuild build -workspace CoverCraft.xcworkspace -scheme CoverCraft -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug CODE_SIGNING_ALLOWED=NO

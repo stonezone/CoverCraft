@@ -57,9 +57,9 @@ public final class PatternState {
     public var inputMode: PatternInputMode = .scan
 
     // Manual dimensions (millimeters)
-    public var manualWidthMillimeters: Double = 400
-    public var manualDepthMillimeters: Double = 400
-    public var manualHeightMillimeters: Double = 400
+    public var manualWidthMillimeters: Double = 0
+    public var manualDepthMillimeters: Double = 0
+    public var manualHeightMillimeters: Double = 0
 
     // Slipcover options
     public var slipcoverTopStyle: SlipcoverTopStyle = .closed
@@ -76,7 +76,9 @@ public final class PatternState {
 
     /// Whether manual dimensions are valid
     public var hasValidManualDimensions: Bool {
-        manualWidthMillimeters > 1 && manualDepthMillimeters > 1 && manualHeightMillimeters > 1
+        (10...10000).contains(manualWidthMillimeters) &&
+        (10...10000).contains(manualDepthMillimeters) &&
+        (10...10000).contains(manualHeightMillimeters)
     }
 }
 

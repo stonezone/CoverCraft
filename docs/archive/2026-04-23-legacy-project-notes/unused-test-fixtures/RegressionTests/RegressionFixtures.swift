@@ -8,9 +8,9 @@ import CoverCraftDTO
 /// Test fixtures for regression testing to prevent reoccurrence of known bugs
 @available(iOS 18.0, macOS 15.0, *)
 public struct RegressionFixtures {
-    
+
     // MARK: - Historical Bug Scenarios
-    
+
     /// Bug #001: Mesh validation crash with empty vertex array
     public static let bug001_EmptyMeshCrash = RegressionTestCase(
         bugId: "BUG-001",
@@ -44,7 +44,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #002: Calibration scale factor infinite loop
     public static let bug002_CalibrationInfiniteLoop = RegressionTestCase(
         bugId: "BUG-002",
@@ -78,7 +78,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #003: Panel segmentation memory leak
     public static let bug003_SegmentationMemoryLeak = RegressionTestCase(
         bugId: "BUG-003",
@@ -112,7 +112,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #004: Flattening produces self-intersecting polygons
     public static let bug004_SelfIntersectingPolygons = RegressionTestCase(
         bugId: "BUG-004",
@@ -146,7 +146,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #005: Export PDF corruption with special characters
     public static let bug005_PDFCorruption = RegressionTestCase(
         bugId: "BUG-005",
@@ -180,7 +180,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #006: AR session crashes on device rotation
     public static let bug006_ARRotationCrash = RegressionTestCase(
         bugId: "BUG-006",
@@ -214,7 +214,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #007: UI becomes unresponsive during large export
     public static let bug007_UIFreezeOnExport = RegressionTestCase(
         bugId: "BUG-007",
@@ -248,7 +248,7 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Bug #008: Negative coordinates in flattened panels
     public static let bug008_NegativeCoordinates = RegressionTestCase(
         bugId: "BUG-008",
@@ -282,9 +282,9 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     // MARK: - Performance Regression Cases
-    
+
     /// Perf Regression #001: Mesh processing time increased 3x in v1.1.0
     public static let perfRegression001_MeshProcessing = PerformanceRegressionCase(
         regressionId: "PERF-001",
@@ -315,7 +315,7 @@ public struct RegressionFixtures {
         rootCause: "Inefficient algorithm introduced in mesh optimization",
         fixed: true
     )
-    
+
     /// Perf Regression #002: Memory usage spike in segmentation
     public static let perfRegression002_MemorySpike = PerformanceRegressionCase(
         regressionId: "PERF-002",
@@ -346,9 +346,9 @@ public struct RegressionFixtures {
         rootCause: "Memory leaks in connectivity analysis",
         fixed: true
     )
-    
+
     // MARK: - Edge Case Regression Tests
-    
+
     /// Edge case that previously caused data corruption
     public static let edgeCase001_DataCorruption = EdgeCaseRegressionTest(
         caseId: "EDGE-001",
@@ -367,10 +367,10 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     /// Edge case with extreme scale values
     public static let edgeCase002_ExtremeScale = EdgeCaseRegressionTest(
-        caseId: "EDGE-002", 
+        caseId: "EDGE-002",
         title: "Extreme calibration scale values cause overflow",
         description: "Very small/large scale factors cause numeric overflow",
         inputData: EdgeCaseTestData(
@@ -386,9 +386,9 @@ public struct RegressionFixtures {
         reproduced: true,
         fixed: true
     )
-    
+
     // MARK: - Collections
-    
+
     /// All historical bug regression tests
     public static let allBugRegressionTests: [RegressionTestCase] = [
         bug001_EmptyMeshCrash,
@@ -400,45 +400,45 @@ public struct RegressionFixtures {
         bug007_UIFreezeOnExport,
         bug008_NegativeCoordinates
     ]
-    
+
     /// All performance regression tests
     public static let allPerformanceRegressionTests: [PerformanceRegressionCase] = [
         perfRegression001_MeshProcessing,
         perfRegression002_MemorySpike
     ]
-    
+
     /// All edge case regression tests
     public static let allEdgeCaseRegressionTests: [EdgeCaseRegressionTest] = [
         edgeCase001_DataCorruption,
         edgeCase002_ExtremeScale
     ]
-    
+
     /// Critical bug tests (crashes, data loss)
     public static let criticalBugTests = allBugRegressionTests.filter { $0.severity == .critical }
-    
+
     /// Fixed bug tests
     public static let fixedBugTests = allBugRegressionTests.filter { $0.fixed }
-    
+
     /// Open bug tests (not yet fixed)
     public static let openBugTests = allBugRegressionTests.filter { !$0.fixed }
-    
+
     // MARK: - Factory Methods
-    
+
     /// Create regression test for specific bug ID
     public static func regressionTestForBug(_ bugId: String) -> RegressionTestCase? {
         allBugRegressionTests.first { $0.bugId == bugId }
     }
-    
+
     /// Get all tests for specific version
     public static func testsForVersion(_ version: String) -> [RegressionTestCase] {
         allBugRegressionTests.filter { $0.reportedVersion == version || $0.fixedVersion == version }
     }
-    
+
     /// Get tests by severity
     public static func testsBySeverity(_ severity: BugSeverity) -> [RegressionTestCase] {
         allBugRegressionTests.filter { $0.severity == severity }
     }
-    
+
     /// Create test data for specific operation
     public static func performanceTestDataFor(_ operation: PerformanceOperation) -> PerformanceTestData {
         switch operation {
@@ -478,7 +478,7 @@ public struct RegressionTestCase: Sendable, Equatable {
     public let testData: RegressionTestData
     public let reproduced: Bool
     public let fixed: Bool
-    
+
     public init(
         bugId: String,
         title: String,
@@ -518,7 +518,7 @@ public struct BugScenario: Sendable, Equatable {
     public let reproductionSteps: [String]
     public let expectedBehavior: String
     public let actualBehavior: String
-    
+
     public init(
         preconditions: [String],
         reproductionSteps: [String],
@@ -538,7 +538,7 @@ public struct RegressionTestData: Sendable, Equatable {
     public let expectedOutput: TestOutputData
     public let errorConditions: [ErrorCondition]
     public let performanceExpectations: PerformanceExpectation
-    
+
     public init(
         inputData: TestInputData,
         expectedOutput: TestOutputData,
@@ -591,7 +591,7 @@ public enum ErrorCondition: Sendable, Equatable {
 public struct PerformanceExpectation: Sendable, Equatable {
     public let maxExecutionTime: TimeInterval
     public let maxMemoryUsage: Int64
-    
+
     public init(maxExecutionTime: TimeInterval, maxMemoryUsage: Int64) {
         self.maxExecutionTime = maxExecutionTime
         self.maxMemoryUsage = maxMemoryUsage
@@ -610,7 +610,7 @@ public struct PerformanceRegressionCase: Sendable, Equatable {
     public let testData: PerformanceTestData
     public let rootCause: String
     public let fixed: Bool
-    
+
     public init(
         regressionId: String,
         title: String,
@@ -650,7 +650,7 @@ public struct PerformanceTestData: Sendable, Equatable {
     public let baselineMetrics: PerformanceMetrics
     public let regressionMetrics: PerformanceMetrics
     public let currentMetrics: PerformanceMetrics
-    
+
     public init(
         inputSize: String,
         baselineMetrics: PerformanceMetrics,
@@ -669,7 +669,7 @@ public struct PerformanceMetrics: Sendable, Equatable {
     public let executionTime: TimeInterval
     public let memoryUsage: Int64
     public let cpuUsage: Double
-    
+
     public init(executionTime: TimeInterval, memoryUsage: Int64, cpuUsage: Double) {
         self.executionTime = executionTime
         self.memoryUsage = memoryUsage
@@ -686,7 +686,7 @@ public struct EdgeCaseRegressionTest: Sendable, Equatable {
     public let validationCriteria: [ValidationCriterion]
     public let reproduced: Bool
     public let fixed: Bool
-    
+
     public init(
         caseId: String,
         title: String,
@@ -711,7 +711,7 @@ public struct EdgeCaseTestData: Sendable, Equatable {
     public let mesh: MeshDTO
     public let expectedBehavior: String
     public let previousBehavior: String
-    
+
     public init(mesh: MeshDTO, expectedBehavior: String, previousBehavior: String) {
         self.mesh = mesh
         self.expectedBehavior = expectedBehavior

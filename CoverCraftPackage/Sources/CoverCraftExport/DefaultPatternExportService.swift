@@ -138,7 +138,9 @@ public final class DefaultPatternExportService: PatternExportService {
             format: format,
             filename: filename,
             metadata: [
+                "format": format.rawValue,
                 "panelCount": "\(panels.count)",
+                "paperSize": options.paperSize.rawValue,
                 "exportTime": ISO8601DateFormatter().string(from: Date()),
                 "version": "1.0.0"
             ]

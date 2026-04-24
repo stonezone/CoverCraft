@@ -25,19 +25,23 @@ public struct MeshProcessingView: View {
 
     public var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                headerSection
-                meshInfoSection
-                holeFillingSectionView
-                planeCroppingSectionView
-                componentIsolationSectionView
-                actionButtons
-                if let result = lastResult {
-                    resultSection(result)
+            VStack(spacing: 18) {
+                heroCard
+                meshSummaryCard
+                holeFillingCard
+                planeCroppingCard
+                fragmentRemovalCard
+                actionCard
+
+                if let lastResult {
+                    resultCard(lastResult)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
+        .background(CoverCraftScreenBackground().ignoresSafeArea())
         .navigationTitle("Mesh Processing")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -47,96 +51,105 @@ public struct MeshProcessingView: View {
         }
     }
 
-    // MARK: - Header
+    private var heroCard: some View {
+        CoverCraftCard(tone: hasAnyOptionEnabled ? .accent : .neutral) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    CoverCraftStatusChip(
+                        hasAnyOptionEnabled ? "Cleanup configured" : "Optional cleanup",
+                        systemImage: hasAnyOptionEnabled ? "slider.horizontal.3" : "wand.and.stars",
+                        tone: hasAnyOptionEnabled ? .accent : .neutral
+                    )
 
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "wand.and.rays")
-                .font(.system(size: 40))
-                .foregroundColor(.blue)
+                    Text("Fix scan noise before calibration or segmentation.")
+                        .font(.title3.weight(.semibold))
 
-            Text("Clean Up Your Scan")
-                .font(.title2)
-                .fontWeight(.semibold)
+                    Text("Use this screen to close small holes, crop floors or ceilings, and discard floating fragments.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            Text("Enable options below to automatically fix common scanning issues")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+                Spacer(minLength: 8)
+
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.blue)
+                    .frame(width: 58, height: 58)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.blue.opacity(0.12))
+                    )
+            }
         }
     }
 
-    // MARK: - Mesh Info
+    private var meshSummaryCard: some View {
+        CoverCraftCard(tone: .neutral) {
+            CoverCraftSectionHeading(
+                step: "Mesh",
+                title: "Scan Summary",
+                subtitle: "Review the raw mesh before applying cleanup operations.",
+                tone: .neutral
+            )
 
-    private var meshInfoSection: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Label("\(mesh.vertices.count)", systemImage: "circle.fill")
-                    .font(.caption)
-                Text("vertices")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 12
+            ) {
+                CoverCraftMetricTile(
+                    title: "Vertices",
+                    value: "\(mesh.vertices.count)",
+                    subtitle: "Captured points",
+                    systemImage: "point.3.connected.trianglepath.dotted",
+                    tone: .accent
+                )
+                CoverCraftMetricTile(
+                    title: "Triangles",
+                    value: "\(mesh.triangleCount)",
+                    subtitle: "Surface density",
+                    systemImage: "triangle",
+                    tone: .accent
+                )
 
-                Spacer()
-
-                Label("\(mesh.triangleCount)", systemImage: "triangle.fill")
-                    .font(.caption)
-                Text("triangles")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            if let info = previewBoundaryInfo {
-                HStack {
-                    if info.isWatertight {
-                        Label("Watertight", systemImage: "checkmark.seal.fill")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    } else {
-                        Label("\(info.holeCount) holes", systemImage: "circle.dashed")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
-                    Spacer()
+                if let info = previewBoundaryInfo {
+                    CoverCraftMetricTile(
+                        title: "Seal",
+                        value: info.isWatertight ? "Watertight" : "\(info.holeCount) holes",
+                        subtitle: info.isWatertight ? "No hole filling needed" : "Gap repair is available below",
+                        systemImage: info.isWatertight ? "checkmark.seal.fill" : "circle.dashed",
+                        tone: info.isWatertight ? .success : .warning
+                    )
+                    CoverCraftMetricTile(
+                        title: "Boundary edges",
+                        value: "\(info.boundaryEdges.count)",
+                        subtitle: "Open-edge count",
+                        systemImage: "square.dashed",
+                        tone: info.isWatertight ? .neutral : .warning
+                    )
                 }
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.1))
-        )
     }
 
-    // MARK: - Hole Filling Section
-
-    private var holeFillingSectionView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $options.enableHoleFilling) {
-                HStack {
-                    Image(systemName: "circle.dashed")
-                        .foregroundColor(.blue)
-                        .frame(width: 24)
-                    VStack(alignment: .leading) {
-                        Text("Fill Small Holes")
-                            .fontWeight(.medium)
-                        Text("Automatically close gaps in the mesh")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
+    private var holeFillingCard: some View {
+        CoverCraftCard(tone: options.enableHoleFilling ? .accent : .neutral) {
+            CleanupToggleHeader(
+                title: "Fill Small Holes",
+                subtitle: "Automatically close small gaps left by incomplete capture.",
+                systemImage: "circle.dashed",
+                isEnabled: $options.enableHoleFilling,
+                tone: options.enableHoleFilling ? .accent : .neutral
+            )
 
             if options.enableHoleFilling {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Max hole size:")
-                            .font(.caption)
-                        Spacer()
-                        Text("\(options.maxHoleEdges) edges")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                ValueSliderPanel(
+                    title: "Max hole size",
+                    valueLabel: "\(options.maxHoleEdges) edges",
+                    footnote: "Higher values repair larger gaps, but can overreach on complex shapes."
+                ) {
                     Slider(
                         value: Binding(
                             get: { Float(options.maxHoleEdges) },
@@ -145,42 +158,24 @@ public struct MeshProcessingView: View {
                         in: 3...50,
                         step: 1
                     )
-                    Text("Larger holes require manual fixing")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    .tint(.blue)
                 }
-                .padding(.leading, 32)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(options.enableHoleFilling ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
-        )
     }
 
-    // MARK: - Plane Cropping Section
-
-    private var planeCroppingSectionView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $options.enablePlaneCropping) {
-                HStack {
-                    Image(systemName: "square.split.bottomrightquarter")
-                        .foregroundColor(.orange)
-                        .frame(width: 24)
-                    VStack(alignment: .leading) {
-                        Text("Remove Floor/Ceiling")
-                            .fontWeight(.medium)
-                        Text("Crop geometry above or below a plane")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
+    private var planeCroppingCard: some View {
+        CoverCraftCard(tone: options.enablePlaneCropping ? .warning : .neutral) {
+            CleanupToggleHeader(
+                title: "Remove Floor or Ceiling",
+                subtitle: "Crop a large support plane when the scan includes the room or table surface.",
+                systemImage: "square.split.bottomrightquarter",
+                isEnabled: $options.enablePlaneCropping,
+                tone: options.enablePlaneCropping ? .warning : .neutral
+            )
 
             if options.enablePlaneCropping {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Direction picker
                     Picker("Direction", selection: $options.cropDirection) {
                         ForEach(CropDirection.allCases, id: \.self) { direction in
                             Text(direction.displayName).tag(direction)
@@ -188,65 +183,39 @@ public struct MeshProcessingView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    // Height slider
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Cut height:")
-                                .font(.caption)
-                            Spacer()
-                            Text("\(Int(options.cropPlaneHeightFraction * 100))% from bottom")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                    ValueSliderPanel(
+                        title: "Cut height",
+                        valueLabel: "\(Int(options.cropPlaneHeightFraction * 100))% from bottom",
+                        footnote: "Keep the crop conservative so it removes only the support surface."
+                    ) {
                         Slider(
                             value: $options.cropPlaneHeightFraction,
                             in: 0...0.5,
                             step: 0.01
                         )
-                        Text("Adjust to remove only the unwanted surface")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        .tint(.orange)
                     }
                 }
-                .padding(.leading, 32)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(options.enablePlaneCropping ? Color.orange.opacity(0.1) : Color.gray.opacity(0.05))
-        )
     }
 
-    // MARK: - Component Isolation Section
-
-    private var componentIsolationSectionView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $options.enableComponentIsolation) {
-                HStack {
-                    Image(systemName: "square.on.square.dashed")
-                        .foregroundColor(.purple)
-                        .frame(width: 24)
-                    VStack(alignment: .leading) {
-                        Text("Remove Fragments")
-                            .fontWeight(.medium)
-                        Text("Keep only the main object, remove floating pieces")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
+    private var fragmentRemovalCard: some View {
+        CoverCraftCard(tone: options.enableComponentIsolation ? .warning : .neutral) {
+            CleanupToggleHeader(
+                title: "Remove Fragments",
+                subtitle: "Keep the main object and discard floating scraps or background shards.",
+                systemImage: "square.on.square.dashed",
+                isEnabled: $options.enableComponentIsolation,
+                tone: options.enableComponentIsolation ? .warning : .neutral
+            )
 
             if options.enableComponentIsolation {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Min fragment size:")
-                            .font(.caption)
-                        Spacer()
-                        Text("\(options.minComponentTriangles) triangles")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                ValueSliderPanel(
+                    title: "Minimum fragment size",
+                    valueLabel: "\(options.minComponentTriangles) triangles",
+                    footnote: "Pieces smaller than this threshold will be removed."
+                ) {
                     Slider(
                         value: Binding(
                             get: { Float(options.minComponentTriangles) },
@@ -255,37 +224,37 @@ public struct MeshProcessingView: View {
                         in: 10...500,
                         step: 10
                     )
-                    Text("Smaller pieces below this threshold are removed")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    .tint(.orange)
                 }
-                .padding(.leading, 32)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(options.enableComponentIsolation ? Color.purple.opacity(0.1) : Color.gray.opacity(0.05))
-        )
     }
 
-    // MARK: - Action Buttons
+    private var actionCard: some View {
+        CoverCraftCard(tone: hasAnyOptionEnabled ? .accent : .neutral) {
+            CoverCraftSectionHeading(
+                step: "Apply",
+                title: "Run Cleanup",
+                subtitle: "Apply the selected mesh fixes, then use the processed result for the rest of the workflow.",
+                tone: hasAnyOptionEnabled ? .accent : .neutral
+            )
 
-    private var actionButtons: some View {
-        VStack(spacing: 12) {
             Button(action: processNow) {
-                HStack {
-                    if isProcessing {
+                if isProcessing {
+                    HStack {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                    } else {
-                        Image(systemName: "sparkles")
+                            .progressViewStyle(.circular)
+                        Text("Processing...")
+                            .frame(maxWidth: .infinity)
                     }
-                    Text(isProcessing ? "Processing..." : "Apply Processing")
+                } else {
+                    Label("Apply Processing", systemImage: "sparkles")
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
             .disabled(isProcessing || !hasAnyOptionEnabled)
 
             HStack(spacing: 12) {
@@ -308,61 +277,58 @@ public struct MeshProcessingView: View {
         options.enableHoleFilling || options.enablePlaneCropping || options.enableComponentIsolation
     }
 
-    // MARK: - Result Section
+    private func resultCard(_ result: MeshProcessingResult) -> some View {
+        CoverCraftCard(tone: .success) {
+            CoverCraftSectionHeading(
+                step: "Done",
+                title: "Processing Complete",
+                subtitle: "The cleaned mesh is now the active source for calibration and generation.",
+                statusTitle: "Updated",
+                statusImage: "checkmark.circle.fill",
+                tone: .success
+            )
 
-    private func resultSection(_ result: MeshProcessingResult) -> some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                Text("Processing Complete")
-                    .font(.headline)
-                    .foregroundColor(.green)
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 12
+            ) {
+                CoverCraftMetricTile(
+                    title: "Before",
+                    value: "\(result.originalTriangleCount)",
+                    subtitle: "Triangles",
+                    systemImage: "triangle",
+                    tone: .neutral
+                )
+                CoverCraftMetricTile(
+                    title: "After",
+                    value: "\(result.finalTriangleCount)",
+                    subtitle: "Triangles",
+                    systemImage: "checkmark.circle.fill",
+                    tone: .success
+                )
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Before:")
-                    Spacer()
-                    Text("\(result.originalTriangleCount) triangles")
-                        .foregroundColor(.secondary)
-                }
-                HStack {
-                    Text("After:")
-                    Spacer()
-                    Text("\(result.finalTriangleCount) triangles")
-                        .foregroundColor(.secondary)
-                }
-
-                Divider()
-
-                Text(result.summary)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Text(result.summary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
             Button("Done") {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
+            .tint(.green)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.green.opacity(0.1))
-        )
     }
-
-    // MARK: - Actions
 
     private func processNow() {
         isProcessing = true
 
-        // Capture values for background processing
         let meshToProcess = mesh
         let processingOptions = options
 
-        // Run processing on background thread
         Task.detached {
             let result = meshToProcess.processed(with: processingOptions)
 
@@ -373,5 +339,73 @@ public struct MeshProcessingView: View {
                 isProcessing = false
             }
         }
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct CleanupToggleHeader: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    @Binding var isEnabled: Bool
+    let tone: CoverCraftTone
+
+    var body: some View {
+        Toggle(isOn: $isEnabled) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tone == .warning ? Color.orange : Color.blue)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .toggleStyle(.switch)
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct ValueSliderPanel<Content: View>: View {
+    let title: String
+    let valueLabel: String
+    let footnote: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Text(valueLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            content()
+
+            Text(footnote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.45))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 }

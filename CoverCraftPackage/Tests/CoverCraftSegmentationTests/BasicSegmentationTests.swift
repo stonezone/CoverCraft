@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import simd
 import CoverCraftDTO
 @testable import CoverCraftCore
@@ -45,5 +46,16 @@ struct BasicSegmentationTests {
         await #expect(throws: SegmentationError.self) {
             try await segmenter.segmentMesh(mesh, targetPanelCount: -1)
         }
+    }
+
+    @Test("Segmentation RNG seed is stable for fixed mesh IDs")
+    func segmentationSeedIsStableForFixedMeshIDs() {
+        let meshID = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
+        let alternateMeshID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+        #expect(DefaultMeshSegmentationService.deterministicSeed(for: meshID) == 7_615_160_862_556_605_891)
+        #expect(DefaultMeshSegmentationService.deterministicSeed(for: alternateMeshID) == 11_753_873_996_732_508_817)
+        #expect(DefaultMeshSegmentationService.deterministicSeed(for: meshID) == DefaultMeshSegmentationService.deterministicSeed(for: meshID))
+        #expect(DefaultMeshSegmentationService.deterministicSeed(for: meshID) != DefaultMeshSegmentationService.deterministicSeed(for: alternateMeshID))
     }
 }

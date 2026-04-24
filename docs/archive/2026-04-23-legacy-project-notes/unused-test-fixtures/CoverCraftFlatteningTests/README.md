@@ -55,7 +55,7 @@ Contains comprehensive 2D pattern data:
 ```swift
 public enum EdgeType: String, CaseIterable {
     case cutLine = "cut"           // Edge to be cut
-    case foldLine = "fold"         // Edge to be folded  
+    case foldLine = "fold"         // Edge to be folded
     case seamAllowance = "seam"    // Seam allowance edge
     case registrationMark = "registration" // Alignment mark
 }
@@ -88,7 +88,7 @@ import Testing
 @Test func areaCalculation() {
     let panel = FlattenedPanelFixtures.rectangularFlattened
     let expectedArea = 100.0 * 150.0 // 10cm × 15cm in mm²
-    
+
     #expect(abs(panel.area - expectedArea) < 1.0)
 }
 ```
@@ -98,7 +98,7 @@ import Testing
 @Test func boundingBoxCalculation() {
     let panel = FlattenedPanelFixtures.rectangularFlattened
     let bounds = panel.boundingBox
-    
+
     #expect(bounds.width == 100.0)
     #expect(bounds.height == 150.0)
     #expect(bounds.origin.x == 0.0)
@@ -111,15 +111,15 @@ import Testing
 @Test func scaleConversion() {
     let mmPanel = FlattenedPanelFixtures.millimeterScale
     let cmPanel = FlattenedPanelFixtures.centimeterScale
-    
+
     // Same real-world size, different scales
     #expect(mmPanel.scaleUnitsPerMeter == 1000.0)
     #expect(cmPanel.scaleUnitsPerMeter == 100.0)
-    
+
     // Convert to real-world dimensions
     let mmRealWidth = mmPanel.boundingBox.width / mmPanel.scaleUnitsPerMeter
     let cmRealWidth = cmPanel.boundingBox.width / cmPanel.scaleUnitsPerMeter
-    
+
     #expect(abs(mmRealWidth - cmRealWidth) < 0.001)
 }
 ```
@@ -128,12 +128,12 @@ import Testing
 ```swift
 @Test func edgeTypeHandling() {
     let panel = FlattenedPanelFixtures.allEdgeTypesPanel
-    
+
     let cutLines = panel.edges.filter { $0.type == .cutLine }
     let foldLines = panel.edges.filter { $0.type == .foldLine }
     let seamLines = panel.edges.filter { $0.type == .seamAllowance }
     let regMarks = panel.edges.filter { $0.type == .registrationMark }
-    
+
     #expect(cutLines.count > 0)
     #expect(foldLines.count > 0)
     #expect(seamLines.count > 0)
@@ -145,10 +145,10 @@ import Testing
 ```swift
 @Test func completeTshirtPattern() {
     let tshirtSet = FlattenedPanelFixtures.tshirtFlattenedSet
-    
+
     #expect(tshirtSet.count == 4) // Front, back, 2 sleeves
     #expect(tshirtSet.allSatisfy { $0.isValid })
-    
+
     // All panels should have same scale
     let scales = Set(tshirtSet.map { $0.scaleUnitsPerMeter })
     #expect(scales.count == 1)
@@ -160,7 +160,7 @@ import Testing
 @Test func layoutOptimization() {
     let panels = FlattenedPanelFixtures.tshirtFlattenedSet
     let optimized = optimizeLayout(panels, paperSize: CGSize(width: 594, height: 841)) // A4
-    
+
     // All panels should fit within bounds
     for panel in optimized {
         let bounds = panel.boundingBox
@@ -176,11 +176,11 @@ import Testing
     let empty = FlattenedPanelFixtures.emptyFlattened
     #expect(!empty.isValid)
     #expect(empty.area == 0.0)
-    
+
     let zeroScale = FlattenedPanelFixtures.zeroScaleFlattened
     #expect(!zeroScale.isValid)
     #expect(zeroScale.scaleUnitsPerMeter == 0.0)
-    
+
     let invalidEdges = FlattenedPanelFixtures.invalidEdgeIndices
     #expect(!invalidEdges.isValid)
 }
@@ -225,11 +225,11 @@ Use panel sets:
 @Test func areaPreservationDuringFlattening() {
     let panel3D = PanelFixtures.frontTorso
     let panelFlat = FlattenedPanelFixtures.frontTorsoFlattened
-    
+
     // 3D surface area should approximately equal 2D area (with distortion tolerance)
     let area3D = calculate3DSurfaceArea(panel3D)
     let area2D = panelFlat.area
-    
+
     let distortionFactor = abs(area2D - area3D) / area3D
     #expect(distortionFactor < 0.1) // Less than 10% distortion
 }
@@ -240,7 +240,7 @@ Use panel sets:
 @Test func selfIntersectionDetection() {
     let panel = FlattenedPanelFixtures.hexagonFlattened
     #expect(!hasSelfIntersections(panel))
-    
+
     // Create problematic panel for testing
     let selfIntersecting = createSelfIntersectingPanel()
     #expect(hasSelfIntersections(selfIntersecting))
@@ -252,11 +252,11 @@ Use panel sets:
 @Test func seamAllowanceGeneration() {
     let basePanel = FlattenedPanelFixtures.rectangularFlattened
     let withSeams = addSeamAllowances(basePanel, width: 15.0) // 1.5cm seams
-    
+
     // Panel with seams should be larger
     #expect(withSeams.boundingBox.width > basePanel.boundingBox.width)
     #expect(withSeams.boundingBox.height > basePanel.boundingBox.height)
-    
+
     // Should have seam allowance edges
     let seamEdges = withSeams.edges.filter { $0.type == .seamAllowance }
     #expect(seamEdges.count > 0)
@@ -272,8 +272,8 @@ let square = FlattenedPanelFixtures.squareFlattened(size: 50.0, scale: 1000.0)
 
 // Create regular polygon
 let pentagon = FlattenedPanelFixtures.regularPolygonFlattened(
-    sides: 5, 
-    radius: 30.0, 
+    sides: 5,
+    radius: 30.0,
     scale: 1000.0
 )
 
@@ -296,7 +296,7 @@ let random = FlattenedPanelFixtures.randomValidFlattenedPanel()
 // Convert from pattern units to real-world meters
 let realWidth = panel.boundingBox.width / panel.scaleUnitsPerMeter
 
-// Convert from real-world meters to pattern units  
+// Convert from real-world meters to pattern units
 let patternWidth = realWidthMeters * panel.scaleUnitsPerMeter
 ```
 

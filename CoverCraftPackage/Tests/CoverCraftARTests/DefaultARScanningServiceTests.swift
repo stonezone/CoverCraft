@@ -286,7 +286,7 @@ struct DefaultARScanningServiceTests {
 struct DefaultARScanningServiceTestsSkipped {
     @Test("Skipped on non-iOS platforms")
     func testSkipped() async throws {
-        #expect(true) // Pass - tests skipped on non-iOS platforms
+        // Intentionally empty: AR scanning requires iOS platform APIs.
     }
 }
 #endif

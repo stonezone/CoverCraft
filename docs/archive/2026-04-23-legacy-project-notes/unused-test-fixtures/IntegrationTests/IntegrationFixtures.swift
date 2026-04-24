@@ -8,9 +8,9 @@ import CoverCraftDTO
 /// Test fixtures for integration testing between modules
 @available(iOS 18.0, macOS 15.0, *)
 public struct IntegrationFixtures {
-    
+
     // MARK: - Complete Workflow Scenarios
-    
+
     /// End-to-end T-shirt scanning and pattern generation workflow
     public static let tshirtWorkflow = WorkflowScenario(
         name: "T-Shirt Complete Workflow",
@@ -39,7 +39,7 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     /// Simple cube workflow (basic geometric shape)
     public static let cubeWorkflow = WorkflowScenario(
         name: "Simple Cube Workflow",
@@ -68,7 +68,7 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     /// Complex garment workflow (stress test)
     public static let complexGarmentWorkflow = WorkflowScenario(
         name: "Complex Garment Workflow",
@@ -110,9 +110,9 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     // MARK: - Error Recovery Scenarios
-    
+
     /// AR tracking lost recovery
     public static let trackingLostRecovery = ErrorRecoveryScenario(
         name: "AR Tracking Lost Recovery",
@@ -134,7 +134,7 @@ public struct IntegrationFixtures {
             recoverySuccessRate: 0.85
         )
     )
-    
+
     /// Calibration failure recovery
     public static let calibrationFailureRecovery = ErrorRecoveryScenario(
         name: "Calibration Failure Recovery",
@@ -155,7 +155,7 @@ public struct IntegrationFixtures {
             recoverySuccessRate: 0.75
         )
     )
-    
+
     /// Memory pressure recovery
     public static let memoryPressureRecovery = ErrorRecoveryScenario(
         name: "Memory Pressure Recovery",
@@ -176,9 +176,9 @@ public struct IntegrationFixtures {
             recoverySuccessRate: 0.90
         )
     )
-    
+
     // MARK: - Module Integration Test Cases
-    
+
     /// AR to Segmentation integration
     public static let arToSegmentationIntegration = ModuleIntegrationTest(
         name: "AR to Segmentation Integration",
@@ -200,10 +200,10 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     /// Segmentation to Flattening integration
     public static let segmentationToFlatteningIntegration = ModuleIntegrationTest(
-        name: "Segmentation to Flattening Integration", 
+        name: "Segmentation to Flattening Integration",
         sourceModule: .segmentation,
         targetModule: .flattening,
         dataFlow: DataFlowScenario(
@@ -223,7 +223,7 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     /// Flattening to Export integration
     public static let flatteningToExportIntegration = ModuleIntegrationTest(
         name: "Flattening to Export Integration",
@@ -246,9 +246,9 @@ public struct IntegrationFixtures {
             ]
         )
     )
-    
+
     // MARK: - Performance Benchmarks
-    
+
     /// Large mesh processing benchmark
     public static let largeMeshBenchmark = PerformanceBenchmark(
         name: "Large Mesh Processing",
@@ -267,8 +267,8 @@ public struct IntegrationFixtures {
             minIOSVersion: "18.0"
         )
     )
-    
-    /// Real-time AR processing benchmark  
+
+    /// Real-time AR processing benchmark
     public static let realTimeARBenchmark = PerformanceBenchmark(
         name: "Real-time AR Processing",
         description: "Benchmark for AR session performance",
@@ -286,9 +286,9 @@ public struct IntegrationFixtures {
             minIOSVersion: "18.0"
         )
     )
-    
+
     // MARK: - Cross-Platform Compatibility Tests
-    
+
     /// iPhone compatibility test
     public static let iPhoneCompatibility = CompatibilityTest(
         name: "iPhone Compatibility",
@@ -306,10 +306,10 @@ public struct IntegrationFixtures {
             .acceptablePerformance
         ]
     )
-    
+
     /// iPad compatibility test
     public static let iPadCompatibility = CompatibilityTest(
-        name: "iPad Compatibility", 
+        name: "iPad Compatibility",
         targetDevices: [
             DeviceProfile(model: "iPad13,8", capabilities: UIStateFixtures.iPadProCapabilities)
         ],
@@ -322,44 +322,44 @@ public struct IntegrationFixtures {
             .extendedMemoryUsage
         ]
     )
-    
+
     // MARK: - Collections
-    
+
     /// All workflow scenarios
     public static let allWorkflowScenarios: [WorkflowScenario] = [
         tshirtWorkflow,
         cubeWorkflow,
         complexGarmentWorkflow
     ]
-    
+
     /// All error recovery scenarios
     public static let allErrorRecoveryScenarios: [ErrorRecoveryScenario] = [
         trackingLostRecovery,
         calibrationFailureRecovery,
         memoryPressureRecovery
     ]
-    
+
     /// All module integration tests
     public static let allModuleIntegrationTests: [ModuleIntegrationTest] = [
         arToSegmentationIntegration,
         segmentationToFlatteningIntegration,
         flatteningToExportIntegration
     ]
-    
+
     /// All performance benchmarks
     public static let allPerformanceBenchmarks: [PerformanceBenchmark] = [
         largeMeshBenchmark,
         realTimeARBenchmark
     ]
-    
+
     /// All compatibility tests
     public static let allCompatibilityTests: [CompatibilityTest] = [
         iPhoneCompatibility,
         iPadCompatibility
     ]
-    
+
     // MARK: - Factory Methods
-    
+
     /// Create workflow with specific mesh
     public static func workflowWithMesh(_ mesh: MeshDTO) -> WorkflowScenario {
         WorkflowScenario(
@@ -384,12 +384,12 @@ public struct IntegrationFixtures {
             )
         )
     }
-    
+
     /// Get random workflow scenario
     public static func randomWorkflowScenario() -> WorkflowScenario {
         allWorkflowScenarios.randomElement() ?? tshirtWorkflow
     }
-    
+
     /// Create performance benchmark for specific operation
     public static func benchmarkForOperation(_ operation: BenchmarkOperation) -> PerformanceBenchmark {
         switch operation {
@@ -411,7 +411,7 @@ public struct WorkflowScenario: Sendable, Equatable {
     public let expectedDuration: TimeInterval
     public let requiredDeviceCapabilities: [DeviceCapability]
     public let testData: WorkflowTestData
-    
+
     public init(
         name: String,
         description: String,
@@ -455,7 +455,7 @@ public struct WorkflowTestData: Sendable, Equatable {
     public let expectedPanelCount: Int
     public let expectedOutputSize: CGSize
     public let validationChecks: [ValidationCheck]
-    
+
     public init(
         inputMesh: MeshDTO,
         calibrationData: CalibrationDTO,
@@ -491,7 +491,7 @@ public struct ErrorRecoveryScenario: Sendable, Equatable {
     public let recoveryTimeoutSeconds: TimeInterval
     public let fallbackAction: FallbackAction
     public let testData: ErrorRecoveryTestData
-    
+
     public init(
         name: String,
         description: String,
@@ -560,7 +560,7 @@ public struct ErrorRecoveryTestData: Sendable, Equatable {
     public let errorMessage: String
     public let expectedUserAction: UserAction
     public let recoverySuccessRate: Double
-    
+
     public init(
         preErrorMeshData: MeshDTO,
         errorMessage: String,
@@ -588,7 +588,7 @@ public struct ModuleIntegrationTest: Sendable, Equatable {
     public let sourceModule: ModuleIdentifier
     public let targetModule: ModuleIdentifier
     public let dataFlow: DataFlowScenario
-    
+
     public init(
         name: String,
         sourceModule: ModuleIdentifier,
@@ -617,7 +617,7 @@ public struct DataFlowScenario: Sendable, Equatable {
     public let transformations: [DataTransformation]
     public let output: DataFlowOutput
     public let validationRules: [ValidationRule]
-    
+
     public init(
         input: DataFlowInput,
         transformations: [DataTransformation],
@@ -685,7 +685,7 @@ public struct PerformanceBenchmark: Sendable, Equatable {
     public let testCase: BenchmarkTestCase
     public let expectedMetrics: PerformanceMetrics
     public let deviceRequirements: DeviceRequirements
-    
+
     public init(
         name: String,
         description: String,
@@ -723,7 +723,7 @@ public struct PerformanceMetrics: Sendable, Equatable {
     public let maxMemoryUsage: Int64
     public let maxCPUUsage: Double
     public let targetFrameRate: Double
-    
+
     public init(
         maxProcessingTime: TimeInterval,
         maxMemoryUsage: Int64,
@@ -743,7 +743,7 @@ public struct DeviceRequirements: Sendable, Equatable {
     public let minCPUCores: Int
     public let requiresLiDAR: Bool
     public let minIOSVersion: String
-    
+
     public init(minRAM: Int64, minCPUCores: Int, requiresLiDAR: Bool, minIOSVersion: String) {
         self.minRAM = minRAM
         self.minCPUCores = minCPUCores
@@ -758,7 +758,7 @@ public struct CompatibilityTest: Sendable, Equatable {
     public let targetDevices: [DeviceProfile]
     public let testScenarios: [WorkflowScenario]
     public let expectedBehaviors: [ExpectedBehavior]
-    
+
     public init(
         name: String,
         targetDevices: [DeviceProfile],
@@ -776,7 +776,7 @@ public struct CompatibilityTest: Sendable, Equatable {
 public struct DeviceProfile: Sendable, Equatable {
     public let model: String
     public let capabilities: DeviceCapabilities
-    
+
     public init(model: String, capabilities: DeviceCapabilities) {
         self.model = model
         self.capabilities = capabilities

@@ -19,8 +19,78 @@
     {
       "target" : {
         "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "CoverCraftCoreTests",
+        "name" : "CoverCraftCoreTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "CoverCraftDTOTests",
+        "name" : "CoverCraftDTOTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "CoverCraftSegmentationTests",
+        "name" : "CoverCraftSegmentationTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "CoverCraftFlatteningTests",
+        "name" : "CoverCraftFlatteningTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "CoverCraftExportTests",
+        "name" : "CoverCraftExportTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
         "identifier" : "CoverCraftFeatureTests",
         "name" : "CoverCraftFeatureTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "IntegrationTests",
+        "name" : "IntegrationTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "ContractTests",
+        "name" : "ContractTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "RegressionTests",
+        "name" : "RegressionTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "ConcurrencyTests",
+        "name" : "ConcurrencyTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CoverCraftPackage",
+        "identifier" : "MemoryTests",
+        "name" : "MemoryTests"
       }
     },
     {

@@ -286,19 +286,21 @@ struct KnownIssuesTests {
         let panels = TestDataFactory.createTestFlattenedPanels(count: 5)
         let options = TestDataFactory.createTestExportOptions()
         
+        var completedExports = 0
         // Perform many exports - should not accumulate memory
-        for iteration in 0..<10 {
+        for _ in 0..<10 {
             let result = try await exportService.exportPatterns(panels, format: .svg, options: options)
             
             #expect(!result.data.isEmpty)
             #expect(result.format == .svg)
+            completedExports += 1
             
             // Small delay to allow cleanup
             try await Task.sleep(nanoseconds: 1_000_000) // 1ms
         }
         
         // If we reach here without memory issues, regression is prevented
-        #expect(true)
+        #expect(completedExports == 10)
     }
     
     @Test("REGRESSION: Concurrent operations causing data races")
@@ -522,17 +524,19 @@ struct KnownIssuesTests {
         let panels = TestDataFactory.createTestFlattenedPanels(count: 2)
         let options = TestDataFactory.createTestExportOptions()
         
+        var completedExports = 0
         // Perform many export operations - should not leak resources
         for _ in 0..<20 {
             let result = try await exportService.exportPatterns(panels, format: testExportFormat, options: options)
             #expect(!result.data.isEmpty)
+            completedExports += 1
             
             // Small delay to allow resource cleanup
             try await Task.sleep(nanoseconds: 1_000_000) // 1ms
         }
         
         // If we complete without system resource errors, leak is prevented
-        #expect(true)
+        #expect(completedExports == 20)
     }
     
     // MARK: - Error Handling Regressions

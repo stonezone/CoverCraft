@@ -330,7 +330,7 @@ private class MockMeshAnchor {
 struct MeshCaptureTestsSkipped {
     @Test("Skipped on non-iOS platforms")
     func testSkipped() async throws {
-        #expect(true) // Pass - tests skipped on non-iOS platforms
+        // Intentionally empty: mesh capture requires iOS platform APIs.
     }
 }
 #endif

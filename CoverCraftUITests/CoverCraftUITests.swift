@@ -21,9 +21,22 @@ final class CoverCraftUITests: XCTestCase {
     }
 
     @MainActor
-    func testManualDimensionsWorkflowShowsExportView() throws {
+    func testManualDimensionsRequireEntryBeforeGenerate() throws {
         let app = XCUIApplication()
         app.launchArguments += ["UITEST_MANUAL_MODE"]
+        app.launch()
+
+        let generateButton = app.buttons["covercraft.generatePatternButton"]
+        scrollToElement(generateButton, in: app)
+        XCTAssertTrue(generateButton.exists)
+        XCTAssertFalse(generateButton.isEnabled)
+        XCTAssertTrue(app.staticTexts["covercraft.manualCalibrationNote"].exists)
+    }
+
+    @MainActor
+    func testManualDimensionsWorkflowShowsExportView() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["UITEST_MANUAL_MODE", "UITEST_MANUAL_READY"]
         app.launch()
 
         openExportViewFromManualMode(in: app)
@@ -33,7 +46,7 @@ final class CoverCraftUITests: XCTestCase {
     @MainActor
     func testManualDimensionsWorkflowExportsPattern() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["UITEST_MANUAL_MODE", "UITEST_RESET_EXPORTS", "UITEST_AUTO_EXPORT"]
+        app.launchArguments += ["UITEST_MANUAL_MODE", "UITEST_MANUAL_READY", "UITEST_RESET_EXPORTS", "UITEST_AUTO_EXPORT"]
         app.launch()
 
         openExportViewFromManualMode(in: app)
@@ -68,8 +81,8 @@ final class CoverCraftUITests: XCTestCase {
 
         generateButton.tap()
 
-        let patternReadyAlert = app.alerts["Pattern Generated"]
-        XCTAssertTrue(patternReadyAlert.waitForExistence(timeout: 10))
-        patternReadyAlert.buttons["View Pattern"].tap()
+        let exportButton = app.buttons["covercraft.exportPatternLink"]
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 10))
+        exportButton.tap()
     }
 }

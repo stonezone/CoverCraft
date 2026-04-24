@@ -76,37 +76,24 @@ struct ExportServiceTests {
         #expect(result.data.prefix(8) == pngSignature)
     }
 
-    @Test("Export to GIF format")
-    func exportToGIFFormat() async throws {
+    @Test("Export to GIF format throws unsupported feature")
+    func exportToGIFFormatThrowsUnsupportedFeature() async throws {
         let panels = TestDataFactory.createTestFlattenedPanels(count: 2)
         let options = TestDataFactory.createTestExportOptions(format: .gif)
 
-        let result = try await service.exportPatterns(panels, format: .gif, options: options)
-
-        #expect(result.format == .gif)
-        #expect(result.filename.hasSuffix(".gif"))
-        #expect(!result.data.isEmpty)
-
-        // GIF should start with GIF signature
-        let content = String(data: result.data.prefix(6), encoding: .ascii)
-        #expect(content == "GIF87a" || content == "GIF89a")
+        await #expect(throws: ExportError.self) {
+            _ = try await service.exportPatterns(panels, format: .gif, options: options)
+        }
     }
 
-    @Test("Export to DXF format")
-    func exportToDXFFormat() async throws {
+    @Test("Export to DXF format throws unsupported feature")
+    func exportToDXFFormatThrowsUnsupportedFeature() async throws {
         let panels = TestDataFactory.createTestFlattenedPanels(count: 3)
         let options = TestDataFactory.createTestExportOptions(format: .dxf)
 
-        let result = try await service.exportPatterns(panels, format: .dxf, options: options)
-
-        #expect(result.format == .dxf)
-        #expect(result.filename.hasSuffix(".dxf"))
-        #expect(!result.data.isEmpty)
-
-        // DXF should contain section headers
-        let content = String(data: result.data, encoding: .utf8)
-        #expect(content?.contains("SECTION") == true)
-        #expect(content?.contains("ENTITIES") == true)
+        await #expect(throws: ExportError.self) {
+            _ = try await service.exportPatterns(panels, format: .dxf, options: options)
+        }
     }
     #endif
     
@@ -401,15 +388,12 @@ struct ExportServiceTests {
     }
 
     #if os(iOS)
-    @Test("All export formats are supported on iOS")
-    func allExportFormatsAreSupported() {
+    @Test("Only implemented export formats are advertised on iOS")
+    func onlyImplementedExportFormatsAreAdvertised() {
         let supportedFormats = service.getSupportedFormats()
-        let allFormats = ExportFormat.allCases
-
-        // Verify service supports all defined formats on iOS
-        for format in allFormats {
-            #expect(supportedFormats.contains(format))
-        }
+        #expect(supportedFormats == [.pdf, .svg, .png])
+        #expect(!supportedFormats.contains(.gif))
+        #expect(!supportedFormats.contains(.dxf))
     }
     #endif
     

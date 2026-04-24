@@ -13,11 +13,7 @@ import CoverCraftUI
 public struct ContentView: View {
     private let logger = Logger(label: "com.covercraft.feature.contentview")
 
-    // MARK: - State
-    
     @Environment(\.dependencyContainer) private var container
-    
-    // MARK: - Dependencies (resolved once on appear)
 
     @State private var arService: ARScanningService?
     @State private var segmentationService: MeshSegmentationService?
@@ -26,9 +22,10 @@ public struct ContentView: View {
     @State private var servicesResolved = false
 
     @State private var appState = Self.makeInitialAppState()
+    @State private var confirmedManualFields = Self.makeInitialManualFields()
+    @State private var lastGeneratedConfiguration: WorkflowConfiguration?
     @State private var showingScanner = false
     @State private var showingHelp = false
-    @State private var showingExportView = false
     @State private var isGeneratingPattern = false
     @State private var errorMessage: String?
     @State private var showErrorAlert = false
@@ -43,22 +40,174 @@ public struct ContentView: View {
             state.inputMode = .manual
         }
 
+        if ProcessInfo.processInfo.arguments.contains("UITEST_MANUAL_READY") {
+            state.inputMode = .manual
+            state.manualWidthMillimeters = 400
+            state.manualDepthMillimeters = 400
+            state.manualHeightMillimeters = 400
+        }
+
         return state
     }
-    
-    // MARK: - Body
-    
+
+    private static func makeInitialManualFields() -> Set<ManualDimensionField> {
+        guard ProcessInfo.processInfo.arguments.contains("UITEST_MANUAL_READY") else {
+            return []
+        }
+
+        return Set(ManualDimensionField.allCases)
+    }
+
+    private var metricColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+    }
+
+    private var workflowTone: CoverCraftTone {
+        if hasFreshGeneratedPattern {
+            return .success
+        }
+
+        if canGenerateCurrentWorkflow {
+            return .accent
+        }
+
+        if appState.inputMode == .manual {
+            return .warning
+        }
+
+        if appState.inputMode == .scan && appState.currentMesh == nil {
+            return .warning
+        }
+
+        return .neutral
+    }
+
+    private var workflowStatusTitle: String {
+        if hasFreshGeneratedPattern {
+            return "Pattern ready"
+        }
+
+        if canGenerateCurrentWorkflow {
+            return "Ready to generate"
+        }
+
+        if appState.inputMode == .manual {
+            return "Enter dimensions"
+        }
+
+        if appState.currentMesh != nil, !appState.calibrationData.isComplete {
+            return "Need scale"
+        }
+
+        return "Need scan"
+    }
+
+    private var workflowStatusImage: String {
+        switch workflowTone {
+        case .success:
+            return "checkmark.seal.fill"
+        case .accent:
+            return "sparkles"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .neutral:
+            return "circle.dashed"
+        }
+    }
+
+    private var inputSummary: String {
+        switch appState.inputMode {
+        case .scan:
+            return appState.currentMesh == nil ? "LiDAR pending" : "Scan captured"
+        case .manual:
+            return hasConfirmedManualDimensions ? "Dimensions set" : "Manual entry"
+        }
+    }
+
+    private var calibrationSummary: String {
+        switch appState.inputMode {
+        case .manual:
+            return "Skipped"
+        case .scan:
+            return appState.calibrationData.isComplete ? "Scaled" : "Pending"
+        }
+    }
+
+    private var outputSummary: String {
+        if hasFreshGeneratedPattern, let flattenedPanels = appState.flattenedPanels {
+            return "\(flattenedPanels.count) panels"
+        }
+
+        return "No export"
+    }
+
+    private var currentWorkflowConfiguration: WorkflowConfiguration {
+        WorkflowConfiguration(
+            inputMode: appState.inputMode,
+            currentMeshID: appState.currentMesh?.id,
+            processedMeshID: appState.processedMesh?.id,
+            calibrationID: appState.calibrationData.id,
+            patternMode: appState.patternMode,
+            manualWidthMillimeters: appState.manualWidthMillimeters,
+            manualDepthMillimeters: appState.manualDepthMillimeters,
+            manualHeightMillimeters: appState.manualHeightMillimeters,
+            slipcoverTopStyle: appState.slipcoverTopStyle,
+            slipcoverEaseMillimeters: appState.slipcoverEaseMillimeters,
+            slipcoverSeamAllowanceMillimeters: appState.slipcoverSeamAllowanceMillimeters,
+            slipcoverSegmentsPerSide: appState.slipcoverSegmentsPerSide,
+            slipcoverVerticalSegments: appState.slipcoverVerticalSegments,
+            slipcoverPanelization: appState.slipcoverPanelization,
+            selectedResolution: appState.selectedResolution
+        )
+    }
+
+    private var hasConfirmedManualDimensions: Bool {
+        confirmedManualFields.count == ManualDimensionField.allCases.count
+    }
+
+    private var canGenerateCurrentWorkflow: Bool {
+        switch appState.inputMode {
+        case .scan:
+            return appState.canGeneratePattern
+        case .manual:
+            return appState.canGeneratePattern && hasConfirmedManualDimensions
+        }
+    }
+
+    private var hasFreshGeneratedPattern: Bool {
+        guard let flattenedPanels = appState.flattenedPanels, !flattenedPanels.isEmpty else {
+            return false
+        }
+
+        return lastGeneratedConfiguration == currentWorkflowConfiguration
+    }
+
     public var body: some View {
         NavigationStack {
-            List {
-                scanSection
-                processingSection
-                calibrationSection
-                segmentationSection
-                exportSection
-                helpSection
+            ScrollView {
+                VStack(spacing: 18) {
+                    inputCard
+                    if appState.inputMode == .scan {
+                        meshCleanupCard
+                        calibrationCard
+                    }
+                    patternConfigurationCard
+                    workflowHeroCard
+                    helpCard
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 120)
             }
+            .scrollIndicators(.hidden)
+            .background(CoverCraftScreenBackground().ignoresSafeArea())
             .navigationTitle("CoverCraft")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
             .sheet(isPresented: $showingScanner) {
                 #if canImport(UIKit)
                 ARScanView(scannedMesh: $appState.currentMesh)
@@ -69,17 +218,6 @@ public struct ContentView: View {
             }
             .sheet(isPresented: $showingHelp) {
                 HelpView()
-            }
-            .alert("Pattern Generated", isPresented: $appState.showPatternReady) {
-                Button("View Pattern") {
-                    showingExportView = true
-                }
-                Button("OK", role: .cancel) { }
-            }
-            .sheet(isPresented: $showingExportView) {
-                NavigationStack {
-                    ExportView(flattenedPanels: appState.flattenedPanels)
-                }
             }
             .alert("Pattern Generation Failed", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) { }
@@ -94,6 +232,15 @@ public struct ContentView: View {
             } message: {
                 Text("Fitted mode uses experimental mesh segmentation that may produce inconsistent results. Slipcover mode is recommended for reliable patterns.")
             }
+            .safeAreaInset(edge: .bottom) {
+                bottomActionBar
+            }
+            .onChange(of: currentWorkflowConfiguration) { _, newConfiguration in
+                guard let lastGeneratedConfiguration, lastGeneratedConfiguration != newConfiguration else {
+                    return
+                }
+                invalidateGeneratedOutput()
+            }
             .task {
                 guard !servicesResolved else { return }
                 arService = container.resolve(ARScanningService.self)
@@ -104,11 +251,82 @@ public struct ContentView: View {
             }
         }
     }
-    
-    // MARK: - Sections
-    
-    private var scanSection: some View {
-        Section {
+
+    private var workflowHeroCard: some View {
+        CoverCraftCard(tone: workflowTone) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    CoverCraftStatusChip(
+                        workflowStatusTitle,
+                        systemImage: workflowStatusImage,
+                        tone: workflowTone
+                    )
+
+                    Text("Generate cleaner sewing patterns from a LiDAR scan or exact dimensions.")
+                        .font(.title2.weight(.semibold))
+
+                    Text("The workflow is now organized around the next required action instead of a long settings list.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(workflowTone == .success ? Color.green.opacity(0.12) : Color.blue.opacity(0.12))
+                        .frame(width: 68, height: 68)
+
+                    Image(systemName: appState.inputMode == .scan ? "camera.viewfinder" : "ruler")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(workflowTone == .success ? Color.green : Color.blue)
+                }
+            }
+
+            LazyVGrid(columns: metricColumns, spacing: 12) {
+                CoverCraftMetricTile(
+                    title: "Input",
+                    value: inputSummary,
+                    subtitle: appState.inputMode.rawValue,
+                    systemImage: "square.and.pencil",
+                    tone: .accent
+                )
+                CoverCraftMetricTile(
+                    title: "Scale",
+                    value: calibrationSummary,
+                    subtitle: appState.inputMode == .manual ? "Manual mode skips calibration" : "Required before generate",
+                    systemImage: "ruler",
+                    tone: appState.inputMode == .manual ? .neutral : (appState.calibrationData.isComplete ? .success : .warning)
+                )
+                CoverCraftMetricTile(
+                    title: "Pattern",
+                    value: appState.patternMode == .slipcover ? "Slipcover" : "Fitted",
+                    subtitle: appState.patternMode == .slipcover ? "Stable bottom-open output" : "Experimental segmentation",
+                    systemImage: "square.grid.3x3.fill",
+                    tone: appState.patternMode == .slipcover ? .accent : .warning
+                )
+                CoverCraftMetricTile(
+                    title: "Export",
+                    value: outputSummary,
+                    subtitle: appState.flattenedPanels == nil ? "Generate before exporting" : "Ready for PDF, SVG, PNG",
+                    systemImage: "square.and.arrow.up",
+                    tone: appState.flattenedPanels == nil ? .neutral : .success
+                )
+            }
+        }
+    }
+
+    private var inputCard: some View {
+        CoverCraftCard(tone: appState.inputMode == .scan ? .accent : .neutral) {
+            CoverCraftSectionHeading(
+                step: "Step 1",
+                title: "Choose Input",
+                subtitle: "Scan for organic geometry or type fixed measurements for rectangular furniture.",
+                statusTitle: appState.inputMode == .scan ? "Scan flow" : "Manual flow",
+                statusImage: appState.inputMode == .scan ? "camera.viewfinder" : "keyboard",
+                tone: appState.inputMode == .scan ? .accent : .neutral
+            )
+
             Picker("Input", selection: $appState.inputMode) {
                 ForEach(PatternInputMode.allCases, id: \.self) { mode in
                     Text(mode.rawValue).tag(mode)
@@ -119,137 +337,233 @@ public struct ContentView: View {
 
             switch appState.inputMode {
             case .scan:
-                Button(action: { showingScanner = true }) {
-                    Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
-                }
-                .accessibilityIdentifier("covercraft.startScanButton")
-
-                if let meshDTO = appState.currentMesh {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("Vertices: \(meshDTO.vertices.count)", systemImage: "cube")
-                                .font(.caption)
-                            Spacer()
-                            Label("Triangles: \(meshDTO.triangleCount)", systemImage: "triangle")
-                                .font(.caption)
-                        }
-                        .foregroundColor(.secondary)
-
-                        // Mesh quality info
-                        let boundaryInfo = meshDTO.analyzeBoundaries()
-                        HStack {
-                            if boundaryInfo.isWatertight {
-                                Label("Watertight", systemImage: "checkmark.seal.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            } else {
-                                Label("\(boundaryInfo.holeCount) hole\(boundaryInfo.holeCount == 1 ? "" : "s")", systemImage: "circle.dashed")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                            Spacer()
-                            if !boundaryInfo.isWatertight {
-                                Text("\(boundaryInfo.boundaryEdges.count) boundary edges")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-
+                scanInputContent
             case .manual:
-                VStack(alignment: .leading, spacing: 10) {
-                    dimensionField("Width (W)", value: $appState.manualWidthMillimeters)
-                    dimensionField("Depth (D)", value: $appState.manualDepthMillimeters)
-                    dimensionField("Height (H)", value: $appState.manualHeightMillimeters)
-                    Text("Enter object dimensions (10-10,000mm). Ease is added during pattern generation.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                manualInputContent
             }
-        } header: {
-            Text("1. Input")
         }
     }
-    
-    private var processingSection: some View {
-        Section {
-            NavigationLink {
-                if let mesh = appState.currentMesh {
+
+    private var scanInputContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button(action: { showingScanner = true }) {
+                Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+            .accessibilityIdentifier("covercraft.startScanButton")
+
+            Text("Capture the object from multiple angles, then clean the mesh and calibrate it before generation.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if let meshDTO = appState.currentMesh {
+                let boundaryInfo = meshDTO.analyzeBoundaries()
+
+                LazyVGrid(columns: metricColumns, spacing: 12) {
+                    CoverCraftMetricTile(
+                        title: "Vertices",
+                        value: "\(meshDTO.vertices.count)",
+                        subtitle: "Raw point count",
+                        systemImage: "point.3.connected.trianglepath.dotted",
+                        tone: .accent
+                    )
+                    CoverCraftMetricTile(
+                        title: "Triangles",
+                        value: "\(meshDTO.triangleCount)",
+                        subtitle: "Surface fidelity",
+                        systemImage: "triangle",
+                        tone: .accent
+                    )
+                    CoverCraftMetricTile(
+                        title: "Seal",
+                        value: boundaryInfo.isWatertight ? "Watertight" : "\(boundaryInfo.holeCount) holes",
+                        subtitle: boundaryInfo.isWatertight ? "Good candidate for flattening" : "Cleanup is recommended",
+                        systemImage: boundaryInfo.isWatertight ? "checkmark.seal.fill" : "circle.dashed",
+                        tone: boundaryInfo.isWatertight ? .success : .warning
+                    )
+                    CoverCraftMetricTile(
+                        title: "Boundary",
+                        value: "\(boundaryInfo.boundaryEdges.count)",
+                        subtitle: "Open edge count",
+                        systemImage: "square.dashed",
+                        tone: boundaryInfo.isWatertight ? .neutral : .warning
+                    )
+                }
+            } else {
+                CoverCraftStatusChip(
+                    "No mesh captured yet",
+                    systemImage: "cube.transparent",
+                    tone: .warning
+                )
+            }
+        }
+    }
+
+    private var manualInputContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ManualDimensionFieldCard(
+                title: "Width",
+                symbol: "arrow.left.and.right",
+                value: $appState.manualWidthMillimeters,
+                accessibilityIdentifier: "covercraft.manualWidthField"
+            ) { isValid in
+                updateManualConfirmation(.width, isValid: isValid)
+            }
+            ManualDimensionFieldCard(
+                title: "Depth",
+                symbol: "arrow.up.and.down",
+                value: $appState.manualDepthMillimeters,
+                accessibilityIdentifier: "covercraft.manualDepthField"
+            ) { isValid in
+                updateManualConfirmation(.depth, isValid: isValid)
+            }
+            ManualDimensionFieldCard(
+                title: "Height",
+                symbol: "arrow.vertical.2",
+                value: $appState.manualHeightMillimeters,
+                accessibilityIdentifier: "covercraft.manualHeightField"
+            ) { isValid in
+                updateManualConfirmation(.height, isValid: isValid)
+            }
+
+            CoverCraftStatusChip(
+                hasConfirmedManualDimensions ? "Manual dimensions ready" : "Enter all three dimensions",
+                systemImage: hasConfirmedManualDimensions ? "checkmark.circle.fill" : "square.and.pencil",
+                tone: hasConfirmedManualDimensions ? .success : .warning
+            )
+
+            Text("Calibration not required for Manual Dimensions.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("covercraft.manualCalibrationNote")
+
+            Text("Valid range is 10-10,000 mm. Pattern generation stays disabled until all three values have been entered or confirmed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var meshCleanupCard: some View {
+        CoverCraftCard(tone: appState.hasProcessedMesh ? .success : .neutral) {
+            CoverCraftSectionHeading(
+                step: "Step 1b",
+                title: "Clean Up Mesh",
+                subtitle: "Optional but useful when the scan includes floor surfaces, fragments, or open holes.",
+                statusTitle: appState.hasProcessedMesh ? "Processed" : "Optional",
+                statusImage: appState.hasProcessedMesh ? "checkmark.circle.fill" : "wand.and.stars",
+                tone: appState.hasProcessedMesh ? .success : .neutral
+            )
+
+            if let mesh = appState.currentMesh {
+                NavigationLink {
                     MeshProcessingView(
                         mesh: mesh,
                         processedMesh: $appState.processedMesh,
                         options: $appState.processingOptions
                     )
+                } label: {
+                    WorkflowNavigationRow(
+                        title: "Open cleanup tools",
+                        subtitle: "Fill holes, crop unwanted surfaces, and isolate the main object before calibration.",
+                        systemImage: "wand.and.stars",
+                        tone: .accent,
+                        trailingText: appState.hasProcessedMesh ? "Updated" : "Review"
+                    )
                 }
-            } label: {
-                HStack {
-                    Label("Clean Up Mesh", systemImage: "wand.and.rays")
-                    Spacer()
-                    if appState.hasProcessedMesh {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                    }
-                }
-            }
-            .disabled(appState.currentMesh == nil)
+                .buttonStyle(.plain)
 
-            if appState.hasProcessedMesh, let processed = appState.processedMesh {
-                HStack {
-                    Text("Using processed mesh")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(processed.triangleCount) triangles")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                if appState.hasProcessedMesh, let processedMesh = appState.processedMesh {
+                    CoverCraftStatusChip(
+                        "Using processed mesh • \(processedMesh.triangleCount) triangles",
+                        systemImage: "checkmark.circle.fill",
+                        tone: .success
+                    )
                 }
-            }
-        } header: {
-            Text("1b. Mesh Cleanup (Optional)")
-        } footer: {
-            Text("Fill holes, remove floor, and isolate your object")
-        }
-    }
-
-    private var calibrationSection: some View {
-        Section {
-            NavigationLink {
-                CalibrationView(
-                    mesh: appState.effectiveMesh,
-                    calibrationData: $appState.calibrationData
+            } else {
+                CoverCraftStatusChip(
+                    "Capture a LiDAR mesh before mesh cleanup is available",
+                    systemImage: "camera.metering.unknown",
+                    tone: .warning
                 )
-            } label: {
-                Label("Set Real-World Scale", systemImage: "ruler")
-            }
-            .disabled(appState.inputMode != .scan || appState.effectiveMesh == nil)
-
-            if appState.calibrationData.isComplete {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Scale: \(String(format: "%.3f", appState.calibrationData.scaleFactor))")
-                        .font(.caption)
-                }
-            }
-        } header: {
-            Text("2. Calibration")
-        } footer: {
-            if appState.inputMode == .manual {
-                Text("Not required for Manual Dimensions.")
-                    .accessibilityIdentifier("covercraft.manualCalibrationNote")
             }
         }
     }
-    
-    private var segmentationSection: some View {
-        Section {
-            Picker("Pattern Type", selection: $appState.patternMode) {
-                ForEach(PatternMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+
+    private var calibrationCard: some View {
+        CoverCraftCard(tone: appState.calibrationData.isComplete ? .success : .neutral) {
+            CoverCraftSectionHeading(
+                step: "Step 2",
+                title: "Set Real-World Scale",
+                subtitle: "Scale the mesh with one measured reference so pattern dimensions stay usable in fabric.",
+                statusTitle: appState.inputMode == .manual ? "Skipped" : (appState.calibrationData.isComplete ? "Scaled" : "Required"),
+                statusImage: appState.inputMode == .manual ? "minus.circle" : (appState.calibrationData.isComplete ? "checkmark.seal.fill" : "ruler"),
+                tone: appState.inputMode == .manual ? .neutral : (appState.calibrationData.isComplete ? .success : .warning)
+            )
+
+            if appState.inputMode == .manual {
+                CoverCraftStatusChip(
+                    "Manual mode does not need calibration",
+                    systemImage: "ruler",
+                    tone: .neutral
+                )
+
+                Text("Calibration not required for Manual Dimensions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("covercraft.manualCalibrationNote")
+            } else if let effectiveMesh = appState.effectiveMesh {
+                NavigationLink {
+                    CalibrationView(
+                        mesh: effectiveMesh,
+                        calibrationData: $appState.calibrationData
+                    )
+                } label: {
+                    WorkflowNavigationRow(
+                        title: appState.calibrationData.isComplete ? "Review calibration" : "Open calibration tools",
+                        subtitle: "Pick a reference dimension, enter the measured distance, and apply scale.",
+                        systemImage: "ruler",
+                        tone: .accent,
+                        trailingText: appState.calibrationData.isComplete ? "Edit" : "Open"
+                    )
                 }
+                .buttonStyle(.plain)
+
+                if appState.calibrationData.isComplete {
+                    CoverCraftStatusChip(
+                        "Scale factor: \(String(format: "%.3f", appState.calibrationData.scaleFactor))",
+                        systemImage: "checkmark.circle.fill",
+                        tone: .success
+                    )
+                }
+            } else {
+                CoverCraftStatusChip(
+                    "A scan is required before calibration becomes available",
+                    systemImage: "cube.transparent",
+                    tone: .warning
+                )
             }
-            .pickerStyle(.menu)
+        }
+    }
+
+    private var patternConfigurationCard: some View {
+        CoverCraftCard(tone: appState.patternMode == .slipcover ? .accent : .warning) {
+            CoverCraftSectionHeading(
+                step: "Step 3",
+                title: "Configure Panels",
+                subtitle: "Choose the stable slipcover path or the experimental fitted path, then tune the output.",
+                statusTitle: appState.patternMode == .slipcover ? "Stable" : "Experimental",
+                statusImage: appState.patternMode == .slipcover ? "checkmark.shield.fill" : "flame.fill",
+                tone: appState.patternMode == .slipcover ? .accent : .warning
+            )
+
+            Picker("Pattern Type", selection: $appState.patternMode) {
+                Text("Slipcover").tag(PatternMode.slipcover)
+                Text("Fitted").tag(PatternMode.fitted)
+            }
+            .pickerStyle(.segmented)
             .disabled(appState.inputMode == .manual)
             .onChange(of: appState.patternMode) { _, newMode in
                 if newMode == .fitted {
@@ -257,140 +571,220 @@ public struct ContentView: View {
                 }
             }
 
+            if appState.inputMode == .manual {
+                Text("Manual dimensions only support slipcover generation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             switch appState.patternMode {
             case .fitted:
-                Picker("Resolution", selection: $appState.selectedResolution) {
-                    ForEach(SegmentationResolution.allCases, id: \.self) { resolution in
-                        Text(resolution.rawValue).tag(resolution)
-                    }
-                }
-                .pickerStyle(.menu)
+                fittedConfiguration
+            case .slipcover:
+                slipcoverConfiguration
+            }
+        }
+    }
 
+    private var fittedConfiguration: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CoverCraftStatusChip(
+                "Fitted mode can need retries on noisy meshes",
+                systemImage: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+
+            Picker("Resolution", selection: $appState.selectedResolution) {
+                Text("Low").tag(SegmentationResolution.low)
+                Text("Medium").tag(SegmentationResolution.medium)
+                Text("High").tag(SegmentationResolution.high)
+            }
+            .pickerStyle(.segmented)
+
+            if let effectiveMesh = appState.effectiveMesh {
                 NavigationLink {
                     SegmentationPreview(
-                        mesh: appState.effectiveMesh,
+                        mesh: effectiveMesh,
                         resolution: appState.selectedResolution,
                         panels: $appState.currentPanels
                     )
                 } label: {
-                    Label("Preview Segmentation", systemImage: "square.grid.3x3")
+                    WorkflowNavigationRow(
+                        title: "Preview segmentation",
+                        subtitle: "See estimated panel count before you flatten the fitted pattern.",
+                        systemImage: "square.grid.3x3",
+                        tone: .warning,
+                        trailingText: "Preview"
+                    )
                 }
-                .disabled(appState.effectiveMesh == nil)
-            case .slipcover:
-                Picker("Top", selection: $appState.slipcoverTopStyle) {
-                    ForEach(SlipcoverTopStyle.allCases, id: \.self) { style in
-                        Text(style.rawValue).tag(style)
-                    }
-                }
-                .pickerStyle(.menu)
+                .buttonStyle(.plain)
+            } else {
+                CoverCraftStatusChip(
+                    "Segmentation preview unlocks after capture and calibration",
+                    systemImage: "eye.slash",
+                    tone: .neutral
+                )
+            }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Ease")
-                        Spacer()
-                        Text("\(Int(appState.slipcoverEaseMillimeters))mm")
-                            .foregroundColor(.secondary)
-                    }
+            Text("Higher resolution produces more panels and more seam lines.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var slipcoverConfiguration: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Picker("Top", selection: $appState.slipcoverTopStyle) {
+                Text("Closed").tag(SlipcoverTopStyle.closed)
+                Text("Open").tag(SlipcoverTopStyle.open)
+            }
+            .pickerStyle(.segmented)
+
+            ValueSliderCard(
+                title: "Ease",
+                valueLabel: "\(Int(appState.slipcoverEaseMillimeters)) mm",
+                systemImage: "arrow.up.left.and.arrow.down.right",
+                tone: .accent,
+                slider: AnyView(
                     Slider(value: $appState.slipcoverEaseMillimeters, in: 0...200, step: 5)
-                }
+                        .tint(.blue)
+                ),
+                footnote: "Extra room added around the object before panel generation."
+            )
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Seam Allowance")
-                        Spacer()
-                        Text("\(Int(appState.slipcoverSeamAllowanceMillimeters))mm")
-                            .foregroundColor(.secondary)
-                    }
+            ValueSliderCard(
+                title: "Seam Allowance",
+                valueLabel: "\(Int(appState.slipcoverSeamAllowanceMillimeters)) mm",
+                systemImage: "scissors",
+                tone: .accent,
+                slider: AnyView(
                     Slider(value: $appState.slipcoverSeamAllowanceMillimeters, in: 3...50, step: 1)
+                        .tint(.blue)
+                ),
+                footnote: "Fabric edge margin included around each panel."
+            )
+
+            HStack(spacing: 12) {
+                StepperCard(
+                    title: "Segments per side",
+                    value: appState.slipcoverSegmentsPerSide,
+                    systemImage: "square.split.2x2",
+                    tone: .accent
+                ) {
+                    Stepper(
+                        "Segments per side: \(appState.slipcoverSegmentsPerSide)",
+                        value: $appState.slipcoverSegmentsPerSide,
+                        in: 1...16
+                    )
+                    .labelsHidden()
                 }
 
-                Stepper("Segments per side: \(appState.slipcoverSegmentsPerSide)", value: $appState.slipcoverSegmentsPerSide, in: 1...16)
-                Stepper("Vertical segments: \(appState.slipcoverVerticalSegments)", value: $appState.slipcoverVerticalSegments, in: 1...16)
+                StepperCard(
+                    title: "Vertical segments",
+                    value: appState.slipcoverVerticalSegments,
+                    systemImage: "rectangle.split.3x1",
+                    tone: .accent
+                ) {
+                    Stepper(
+                        "Vertical segments: \(appState.slipcoverVerticalSegments)",
+                        value: $appState.slipcoverVerticalSegments,
+                        in: 1...16
+                    )
+                    .labelsHidden()
+                }
+            }
 
-                Picker("Panels", selection: $appState.slipcoverPanelization) {
-                    ForEach(SlipcoverPanelization.allCases, id: \.self) { panelization in
-                        Text(panelization.rawValue).tag(panelization)
-                    }
+            Picker("Panels", selection: $appState.slipcoverPanelization) {
+                ForEach(SlipcoverPanelization.allCases, id: \.self) { panelization in
+                    Text(panelization.rawValue).tag(panelization)
                 }
-                .pickerStyle(.segmented)
             }
-        } header: {
-            Text("3. Panel Configuration")
-        } footer: {
-            switch appState.patternMode {
-            case .fitted:
-                Text("Higher resolution creates more panels for better fit")
-            case .slipcover:
-                Text("Slipcover patterns are robust and gravity-based (bottom-open)")
-            }
+            .pickerStyle(.segmented)
+
+            Text("Slipcover output stays bottom-open and is the most reliable path for production use.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
-    
-    private var exportSection: some View {
-        Section {
-            Button(action: generatePattern) {
-                if isGeneratingPattern {
-                    HStack {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                        Text("Generating...")
-                    }
-                } else {
-                    Label("Generate Pattern", systemImage: "scissors")
-                }
-            }
-            .accessibilityIdentifier("covercraft.generatePatternButton")
-            .disabled(!appState.canGeneratePattern || isGeneratingPattern)
-            
-            if appState.flattenedPanels != nil {
-                NavigationLink {
-                    ExportView(flattenedPanels: appState.flattenedPanels)
-                } label: {
-                    Label("Export Pattern", systemImage: "square.and.arrow.up")
-                }
-                .accessibilityIdentifier("covercraft.exportPatternLink")
-            }
-        } header: {
-            Text("4. Generate Pattern")
-        }
-    }
-    
-    private var helpSection: some View {
-        Section {
+
+    private var helpCard: some View {
+        CoverCraftCard(tone: .neutral) {
+            CoverCraftSectionHeading(
+                step: "Help",
+                title: "Need the workflow guide?",
+                subtitle: "Open the built-in instructions for scanning, calibration, and export recommendations.",
+                tone: .neutral
+            )
+
             Button(action: { showingHelp = true }) {
                 Label("How to Use", systemImage: "questionmark.circle")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
         }
     }
-    
-    // MARK: - Helper Views
 
-    private func dimensionField(_ label: String, value: Binding<Double>) -> some View {
-        HStack {
-            Text(label)
-                .frame(width: 80, alignment: .leading)
-            TextField("mm", value: value, format: .number)
-                .multilineTextAlignment(.trailing)
-                #if canImport(UIKit)
-                .keyboardType(.decimalPad)
-                #endif
-                .frame(minWidth: 80)
-                .onChange(of: value.wrappedValue) { _, newValue in
-                    // Clamp to valid range: 10-10,000mm
-                    let clamped = min(max(newValue, 10), 10000)
-                    if clamped != newValue {
-                        value.wrappedValue = clamped
+    private var bottomActionBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .opacity(0.35)
+
+            CoverCraftCard(tone: hasFreshGeneratedPattern ? .success : workflowTone) {
+                if hasFreshGeneratedPattern, let flattenedPanels = appState.flattenedPanels, !flattenedPanels.isEmpty {
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            ExportView(flattenedPanels: flattenedPanels)
+                        } label: {
+                            Label("Export", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .accessibilityIdentifier("covercraft.exportPatternLink")
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+
+                        Button(action: generatePattern) {
+                            if isGeneratingPattern {
+                                Label("Generating...", systemImage: "hourglass")
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label("Regenerate", systemImage: "arrow.clockwise")
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!canGenerateCurrentWorkflow || isGeneratingPattern)
                     }
+                } else {
+                    Button(action: generatePattern) {
+                        if isGeneratingPattern {
+                            HStack {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                Text("Generating...")
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                        } else {
+                            Label("Generate Pattern", systemImage: "scissors")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .accessibilityIdentifier("covercraft.generatePatternButton")
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(.blue)
+                    .disabled(!canGenerateCurrentWorkflow || isGeneratingPattern)
                 }
-            Text("mm")
-                .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
         }
+        .background(.ultraThinMaterial)
     }
-
-    // MARK: - Actions
 
     private func generatePattern() {
-        guard appState.canGeneratePattern else { return }
+        guard canGenerateCurrentWorkflow else { return }
 
         guard let flattener = flatteningService else {
             let message = "Required services are not available. Please restart the app."
@@ -425,12 +819,12 @@ public struct ContentView: View {
                     await MainActor.run {
                         appState.currentPanels = panels
                         appState.flattenedPanels = optimizedPanels
-                        appState.showPatternReady = true
+                        appState.showPatternReady = false
+                        lastGeneratedConfiguration = currentWorkflowConfiguration
                         isGeneratingPattern = false
                         hapticService?.success()
                     }
                 case .slipcover:
-                    // Capture values from @MainActor state before background work
                     let options = SlipcoverPatternOptions(
                         topStyle: appState.slipcoverTopStyle,
                         easeMillimeters: appState.slipcoverEaseMillimeters,
@@ -446,7 +840,6 @@ public struct ContentView: View {
                     let manualDepth = appState.manualDepthMillimeters
                     let manualHeight = appState.manualHeightMillimeters
 
-                    // Run synchronous generation off main actor to avoid UI blocking
                     let generatedPanels: [FlattenedPanelDTO] = try await Task.detached {
                         let generator = SlipcoverPatternGenerator()
                         switch inputMode {
@@ -471,7 +864,8 @@ public struct ContentView: View {
                     await MainActor.run {
                         appState.currentPanels = nil
                         appState.flattenedPanels = optimizedPanels
-                        appState.showPatternReady = true
+                        appState.showPatternReady = false
+                        lastGeneratedConfiguration = currentWorkflowConfiguration
                         isGeneratingPattern = false
                         hapticService?.success()
                     }
@@ -485,5 +879,264 @@ public struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func invalidateGeneratedOutput() {
+        guard appState.currentPanels != nil || appState.flattenedPanels != nil else { return }
+
+        appState.output.clearOutput()
+        lastGeneratedConfiguration = nil
+    }
+
+    private func updateManualConfirmation(_ field: ManualDimensionField, isValid: Bool) {
+        if isValid {
+            confirmedManualFields.insert(field)
+        } else {
+            confirmedManualFields.remove(field)
+        }
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct WorkflowNavigationRow: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let tone: CoverCraftTone
+    let trailingText: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(tone == .warning ? Color.orange.opacity(0.12) : Color.blue.opacity(0.12))
+                    .frame(width: 46, height: 46)
+
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(tone == .warning ? Color.orange : Color.blue)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(spacing: 4) {
+                Text(trailingText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private enum ManualDimensionField: CaseIterable {
+    case width
+    case depth
+    case height
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct WorkflowConfiguration: Equatable {
+    let inputMode: PatternInputMode
+    let currentMeshID: UUID?
+    let processedMeshID: UUID?
+    let calibrationID: UUID
+    let patternMode: PatternMode
+    let manualWidthMillimeters: Double
+    let manualDepthMillimeters: Double
+    let manualHeightMillimeters: Double
+    let slipcoverTopStyle: SlipcoverTopStyle
+    let slipcoverEaseMillimeters: Double
+    let slipcoverSeamAllowanceMillimeters: Double
+    let slipcoverSegmentsPerSide: Int
+    let slipcoverVerticalSegments: Int
+    let slipcoverPanelization: SlipcoverPanelization
+    let selectedResolution: SegmentationResolution
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct ManualDimensionFieldCard: View {
+    let title: String
+    let symbol: String
+    @Binding var value: Double
+    let accessibilityIdentifier: String
+    let onValidityChange: (Bool) -> Void
+
+    @State private var text: String
+
+    init(
+        title: String,
+        symbol: String,
+        value: Binding<Double>,
+        accessibilityIdentifier: String,
+        onValidityChange: @escaping (Bool) -> Void
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self._value = value
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.onValidityChange = onValidityChange
+        self._text = State(initialValue: Self.text(for: value.wrappedValue))
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.blue)
+                .frame(width: 24)
+
+            Text(title)
+                .font(.headline)
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 6) {
+                TextField("Required", text: $text)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier(accessibilityIdentifier)
+                    #if canImport(UIKit)
+                    .keyboardType(.decimalPad)
+                    #endif
+                    .frame(width: 92)
+                    .onChange(of: text) { _, newValue in
+                        applyText(newValue)
+                    }
+
+                Text("mm")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.75))
+            )
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.45))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+
+    private static func text(for value: Double) -> String {
+        guard value > 0 else { return "" }
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return String(value)
+    }
+
+    private func applyText(_ rawValue: String) {
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty, let parsedValue = Double(trimmedValue) else {
+            value = 0
+            onValidityChange(false)
+            return
+        }
+
+        value = parsedValue
+        onValidityChange((10...10000).contains(parsedValue))
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct ValueSliderCard: View {
+    let title: String
+    let valueLabel: String
+    let systemImage: String
+    let tone: CoverCraftTone
+    let slider: AnyView
+    let footnote: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(title, systemImage: systemImage)
+                    .font(.headline)
+
+                Spacer()
+
+                Text(valueLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tone == .warning ? Color.orange : Color.blue)
+            }
+
+            slider
+
+            Text(footnote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.45))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct StepperCard<Control: View>: View {
+    let title: String
+    let value: Int
+    let systemImage: String
+    let tone: CoverCraftTone
+    @ViewBuilder let control: () -> Control
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tone == .warning ? Color.orange : Color.blue)
+
+            Text("\(value)")
+                .font(.title2.weight(.semibold))
+
+            control()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.45))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 }

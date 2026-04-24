@@ -4,153 +4,70 @@ import SwiftUI
 @MainActor
 public struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
-    
+
     public init() {}
-    
+
     public var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("How to Use CoverCraft")
-                            .font(.largeTitle)
-                            .bold()
-                        
-                        Text("Generate slipcover or fitted sewing patterns from a LiDAR scan or manual dimensions.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    // Step 1
-                    helpStep(
-                        number: "1",
+                VStack(spacing: 18) {
+                    introCard
+                    stepCard(
+                        step: "1",
                         title: "Choose Input",
-                        description: "Use Manual Dimensions for rectangular furniture when you already know width, depth, and height. Use LiDAR Scan when you need scan-derived geometry.",
+                        description: "Manual dimensions are faster for rectangular furniture. LiDAR is the better route when you need geometry from a real object.",
+                        systemImage: "square.and.pencil",
+                        tips: [
+                            "Manual dimensions use millimeters.",
+                            "Fitted mode requires a LiDAR scan.",
+                            "Slipcover mode works with either input path."
+                        ],
+                        tone: .accent
+                    )
+                    stepCard(
+                        step: "2",
+                        title: "Capture or Measure",
+                        description: "Scan slowly from multiple angles or enter width, depth, and height directly.",
                         systemImage: "camera.viewfinder",
                         tips: [
-                            "Manual Dimensions is the fastest path for slipcover patterns",
-                            "Fitted mode requires a LiDAR scan",
-                            "Dimensions are entered in millimeters"
-                        ]
+                            "Keep the full silhouette in frame while scanning.",
+                            "Measure the widest real-world extents for manual mode.",
+                            "Cleanup is optional but helps if the scan includes the floor."
+                        ],
+                        tone: .neutral
                     )
-                    
-                    Divider()
-                    
-                    // Step 2
-                    helpStep(
-                        number: "2",
-                        title: "Capture or Enter Dimensions",
-                        description: "For scan mode, capture the object from multiple angles and calibrate the mesh. For manual mode, enter width, depth, and height directly.",
+                    stepCard(
+                        step: "3",
+                        title: "Calibrate and Configure",
+                        description: "Scale the mesh from one known reference, then set slipcover or fitted panel options.",
                         systemImage: "ruler",
                         tips: [
-                            "Move slowly and keep the full silhouette in frame",
-                            "Use two clear points when calibrating a scan",
-                            "Manual mode skips calibration entirely",
-                            "Measure the widest real-world dimensions"
-                        ]
+                            "Slipcover is the stable path.",
+                            "Fitted mode is experimental and can require retries.",
+                            "Check ease and seam allowance before generating."
+                        ],
+                        tone: .warning
                     )
-                    
-                    Divider()
-                    
-                    // Step 3
-                    helpStep(
-                        number: "3",
-                        title: "Choose Pattern Type",
-                        description: "Slipcover mode is the stable path for boxy covers. Fitted mode uses experimental segmentation and may require retries.",
-                        systemImage: "square.grid.3x3",
-                        tips: [
-                            "Slipcover patterns are bottom-open and gravity-based",
-                            "Fitted mode is still experimental",
-                            "Higher fitted resolution creates more panels",
-                            "Check ease and seam allowance before generating"
-                        ]
-                    )
-                    
-                    Divider()
-                    
-                    // Step 4
-                    helpStep(
-                        number: "4",
+                    stepCard(
+                        step: "4",
                         title: "Generate and Export",
-                        description: "Generate the pattern, review the export screen, and save it as PDF, SVG, or PNG.",
+                        description: "Generate the panels, review the export preview, and write the output to a file format that fits the next step.",
                         systemImage: "square.and.arrow.up",
                         tips: [
-                            "Exports are saved in Documents/CoverCraft Patterns",
-                            "PDF is best for printing at full scale",
-                            "SVG is best for downstream editing",
-                            "PNG is best for quick previews"
-                        ]
+                            "PDF is best for printing.",
+                            "SVG is best for editing.",
+                            "Exports are written to Documents/CoverCraft Patterns."
+                        ],
+                        tone: .success
                     )
-                    
-                    Divider()
-                    
-                    // Requirements
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Requirements")
-                            .font(.title2)
-                            .bold()
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            requirementRow(
-                                icon: "iphone",
-                                text: "LiDAR-capable iPhone or iPad only for scan workflows"
-                            )
-                            
-                            requirementRow(
-                                icon: "square.3.layers.3d",
-                                text: "Manual mode works without a scan"
-                            )
-                            
-                            requirementRow(
-                                icon: "ruler",
-                                text: "Tape measure or ruler for manual entry or scan calibration"
-                            )
-                            
-                            requirementRow(
-                                icon: "printer",
-                                text: "Printer for physical patterns (optional)"
-                            )
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Tips
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Pro Tips")
-                            .font(.title2)
-                            .bold()
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            tipRow(
-                                icon: "lightbulb",
-                                title: "Start With Slipcover",
-                                description: "Use slipcover mode first when you need a reliable pattern path."
-                            )
-                            
-                            tipRow(
-                                icon: "ruler.fill",
-                                title: "Measure Real Extents",
-                                description: "Manual mode works best when width, depth, and height reflect the outermost points of the object."
-                            )
-                            
-                            tipRow(
-                                icon: "scissors",
-                                title: "Check Export Scale",
-                                description: "Print PDF exports at 100% and verify the calibration bar before cutting fabric."
-                            )
-                            
-                            tipRow(
-                                icon: "doc.text",
-                                title: "Keep Exports",
-                                description: "Export to PDF and SVG if you want both print-ready output and editable geometry."
-                            )
-                        }
-                    }
+                    requirementsCard
+                    tipsCard
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
+            .background(CoverCraftScreenBackground().ignoresSafeArea())
             .navigationTitle("Help")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -164,83 +81,101 @@ public struct HelpView: View {
             }
         }
     }
-    
-    private func helpStep(number: String, title: String, description: String, systemImage: String, tips: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                ZStack {
-                    Circle()
-                        .fill(.blue)
-                        .frame(width: 32, height: 32)
-                    
-                    Text(number)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text(description)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Image(systemName: systemImage)
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
+
+    private var introCard: some View {
+        CoverCraftCard(tone: .accent) {
+            CoverCraftSectionHeading(
+                step: "Guide",
+                title: "How CoverCraft Works",
+                subtitle: "The shortest path is manual dimensions plus slipcover. Use LiDAR when you need the object’s real geometry.",
+                statusTitle: "4 steps",
+                statusImage: "list.number",
+                tone: .accent
+            )
+        }
+    }
+
+    private func stepCard(
+        step: String,
+        title: String,
+        description: String,
+        systemImage: String,
+        tips: [String],
+        tone: CoverCraftTone
+    ) -> some View {
+        CoverCraftCard(tone: tone) {
+            CoverCraftSectionHeading(
+                step: "Step \(step)",
+                title: title,
+                subtitle: description,
+                statusTitle: title,
+                statusImage: systemImage,
+                tone: tone
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(tips, id: \.self) { tip in
-                    HStack(alignment: .top) {
-                        Text("•")
-                            .foregroundColor(.blue)
-                            .fontWeight(.bold)
-                        Text(tip)
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(tone == .warning ? Color.orange : Color.blue)
                             .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                            .padding(.top, 2)
+
+                        Text(tip)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
-            .padding(.leading, 40)
         }
     }
-    
-    private func requirementRow(icon: String, text: String) -> some View {
-        HStack {
+
+    private var requirementsCard: some View {
+        CoverCraftCard(tone: .neutral) {
+            CoverCraftSectionHeading(
+                step: "Requirements",
+                title: "What You Need",
+                subtitle: "Keep the supporting tools minimal and specific.",
+                tone: .neutral
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                helpRow(icon: "iphone", text: "LiDAR-capable iPhone or iPad for scan workflows")
+                helpRow(icon: "square.3.layers.3d", text: "Manual mode works without a scan")
+                helpRow(icon: "ruler", text: "A real measuring tool for calibration or manual entry")
+                helpRow(icon: "printer", text: "Printer optional for physical patterns")
+            }
+        }
+    }
+
+    private var tipsCard: some View {
+        CoverCraftCard(tone: .success) {
+            CoverCraftSectionHeading(
+                step: "Tips",
+                title: "Keep the Output Usable",
+                subtitle: "These are the highest-value checks before fabric is cut.",
+                tone: .success
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                helpRow(icon: "shield.checkered", text: "Start with slipcover when reliability matters more than contour detail")
+                helpRow(icon: "ruler.fill", text: "Measure the true outer extents of the object, not the average surface")
+                helpRow(icon: "doc.text", text: "Export both PDF and SVG if you need a print file plus editable geometry")
+                helpRow(icon: "scissors", text: "Print PDFs at 100% scale and verify any reference bar before cutting")
+            }
+        }
+    }
+
+    private func helpRow(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
+                .foregroundStyle(.blue)
                 .frame(width: 20)
-                .foregroundColor(.blue)
+                .padding(.top, 2)
+
             Text(text)
                 .font(.subheadline)
-            Spacer()
-        }
-    }
-    
-    private func tipRow(icon: String, title: String, description: String) -> some View {
-        HStack(alignment: .top) {
-            Image(systemName: icon)
-                .frame(width: 20)
-                .foregroundColor(.orange)
-                .padding(.top, 2)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
+                .foregroundStyle(.secondary)
         }
     }
 }

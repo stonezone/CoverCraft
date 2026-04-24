@@ -56,7 +56,7 @@ import Testing
 
 @Test func exportConfigurationValidation() {
     let config = ExportFixtures.pdfPatternConfig
-    
+
     #expect(config.format == .pdf)
     #expect(config.dpi == 300)
     #expect(config.includeMargins == true)
@@ -69,9 +69,9 @@ import Testing
 @Test func pdfExportTesting() {
     let config = ExportFixtures.pdfPatternConfig
     let panels = FlattenedPanelFixtures.tshirtFlattenedSet
-    
+
     let result = exportToPDF(panels: panels, config: config)
-    
+
     #expect(result.isSuccess)
     #expect(result.format == .pdf)
     #expect(result.outputData != nil)
@@ -83,11 +83,11 @@ import Testing
 @Test func sampleDataIntegrity() {
     let pdfData = ExportFixtures.samplePDFData
     let svgData = ExportFixtures.sampleSVGData
-    
+
     // Validate PDF structure
     #expect(pdfData.starts(with: "%PDF".data(using: .utf8)!))
-    
-    // Validate SVG structure  
+
+    // Validate SVG structure
     let svgString = String(data: svgData, encoding: .utf8)
     #expect(svgString?.contains("<?xml") == true)
     #expect(svgString?.contains("<svg") == true)
@@ -98,7 +98,7 @@ import Testing
 ```swift
 @Test func patternTemplateValidation() {
     let template = ExportFixtures.tshirtTemplate
-    
+
     #expect(template.name == "Basic T-Shirt")
     #expect(template.category == .apparel)
     #expect(template.difficulty == .beginner)
@@ -112,21 +112,21 @@ import Testing
 @Test func paperSizeCalculations() {
     let usLetter = ExportFixtures.usLetterPaper
     let a4 = ExportFixtures.a4Paper
-    
+
     // US Letter dimensions
     #expect(usLetter.width == 612.0)
     #expect(usLetter.height == 792.0)
-    
+
     // A4 dimensions
     #expect(a4.width == 595.0)
     #expect(a4.height == 842.0)
-    
+
     // Margin calculations
     let usLetterContent = CGSize(
         width: usLetter.width - usLetter.margins.left - usLetter.margins.right,
         height: usLetter.height - usLetter.margins.top - usLetter.margins.bottom
     )
-    
+
     #expect(usLetterContent.width == 540.0) // 612 - 36 - 36
     #expect(usLetterContent.height == 720.0) // 792 - 36 - 36
 }
@@ -138,17 +138,17 @@ import Testing
     let success = ExportFixtures.successfulExport
     let failure = ExportFixtures.failedExport
     let warning = ExportFixtures.exportWithWarnings
-    
+
     // Successful export
     #expect(success.isSuccess)
     #expect(success.outputData != nil)
     #expect(success.error == nil)
-    
+
     // Failed export
     #expect(!failure.isSuccess)
     #expect(failure.outputData == nil)
     #expect(failure.error != nil)
-    
+
     // Export with warnings
     #expect(warning.isSuccess)
     #expect(warning.outputData != nil)
@@ -160,13 +160,13 @@ import Testing
 ```swift
 @Test func multiFormatExport() {
     let panels = FlattenedPanelFixtures.basicFlattenedShapes
-    
+
     for format in ExportFormat.allCases {
         let config = ExportFixtures.configurationFor(format: format)
         let result = exportPanels(panels, config: config)
-        
+
         #expect(result.format == format)
-        
+
         if result.isSuccess {
             #expect(result.outputData != nil)
             #expect(result.fileSize > 0)
@@ -180,19 +180,19 @@ import Testing
 @Test func scaleAndResolutionTesting() {
     let highRes = ExportFixtures.professionalPrintConfig
     let lowRes = ExportFixtures.draftModeConfig
-    
+
     #expect(highRes.dpi == 600)
     #expect(highRes.colorMode == .cmyk)
-    
+
     #expect(lowRes.dpi == 72)
     #expect(lowRes.colorMode == .grayscale)
-    
+
     // Same pattern, different resolutions should produce different file sizes
     let panels = [FlattenedPanelFixtures.rectangularFlattened]
-    
+
     let highResResult = exportPanels(panels, config: highRes)
     let lowResResult = exportPanels(panels, config: lowRes)
-    
+
     if highResResult.isSuccess && lowResResult.isSuccess {
         #expect(highResResult.fileSize > lowResResult.fileSize)
     }
@@ -208,7 +208,7 @@ Use specific fixtures:
 - Isolated pattern templates
 - Sample data validation
 
-### Integration Tests - Complete Workflows  
+### Integration Tests - Complete Workflows
 Use fixture combinations:
 - `tshirtFlattenedSet` → `pdfPatternConfig` → `successfulExport`
 - Multiple panels with layout optimization
@@ -239,13 +239,13 @@ Use complex scenarios:
 @Test func pdfExportFeatures() {
     let config = ExportFixtures.pdfPatternConfig
     let panels = FlattenedPanelFixtures.tshirtFlattenedSet
-    
+
     let result = exportToPDF(panels: panels, config: config)
-    
+
     if result.isSuccess {
         // Validate PDF content
         #expect(result.outputData?.starts(with: "%PDF".data(using: .utf8)!) == true)
-        
+
         // Check metadata
         #expect(result.metadata?.originalPanelCount == panels.count)
         #expect(result.metadata?.exportedPanelCount == panels.count)
@@ -258,12 +258,12 @@ Use complex scenarios:
 @Test func svgExportFeatures() {
     let config = ExportFixtures.svgDigitalConfig
     let panel = FlattenedPanelFixtures.allEdgeTypesPanel
-    
+
     let result = exportToSVG(panels: [panel], config: config)
-    
+
     if result.isSuccess, let data = result.outputData {
         let svgString = String(data: data, encoding: .utf8)
-        
+
         // Check for different edge types in SVG
         #expect(svgString?.contains("cut-line") == true)
         #expect(svgString?.contains("fold-line") == true)
@@ -277,17 +277,17 @@ Use complex scenarios:
 @Test func rasterExportFeatures() {
     let pngConfig = ExportFixtures.pngPreviewConfig
     let jpegConfig = ExportFixtures.jpegThumbnailConfig
-    
+
     let panels = [FlattenedPanelFixtures.rectangularFlattened]
-    
+
     let pngResult = exportToPNG(panels: panels, config: pngConfig)
     let jpegResult = exportToJPEG(panels: panels, config: jpegConfig)
-    
+
     if pngResult.isSuccess {
         // PNG should support transparency
         #expect(pngResult.outputData?.count ?? 0 > 100)
     }
-    
+
     if jpegResult.isSuccess {
         // JPEG should be smaller due to compression
         #expect(jpegResult.fileSize < pngResult.fileSize)

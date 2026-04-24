@@ -24,7 +24,7 @@ struct ThreadSafetyTests {
         
         // Test concurrent access to services
         await withTaskGroup(of: Void.self) { group in
-            for i in 0..<100 {
+            for _ in 0..<100 {
                 group.addTask {
                     // Each task tries to access services
                     let _: MeshSegmentationService? = container.resolve(MeshSegmentationService.self)
@@ -161,7 +161,7 @@ struct ThreadSafetyTests {
                     
                     do {
                         let panels = try await segmenter.segmentMesh(mesh, targetPanelCount: 3)
-                        let count = await sharedState.incrementCount()
+                        _ = await sharedState.incrementCount()
                         
                         // Verify no corruption in the data
                         for panel in panels {
@@ -246,7 +246,8 @@ struct ThreadSafetyTests {
             }
         }
         
-        #expect(true) // If we get here, Sendable conformance is correct
+        #expect(mesh.vertices.count == 3)
+        #expect(panel.vertexIndices.count == 3)
     }
     
     // MARK: - Task Cancellation Tests
@@ -273,7 +274,7 @@ struct ThreadSafetyTests {
             #expect(Bool(false), "Task should have been cancelled")
         } catch {
             // Task was cancelled or threw an error - both are acceptable
-            #expect(true)
+            #expect(task.isCancelled || !String(describing: error).isEmpty)
         }
     }
     
@@ -361,8 +362,10 @@ struct ThreadSafetyTests {
             }
         }
         
-        // If we reach here within time limit, no deadlock occurred
-        #expect(true)
+        // If we reach here within time limit, no deadlock occurred.
+        #expect(container.resolve(MeshSegmentationService.self) != nil)
+        #expect(container.resolve(PatternFlatteningService.self) != nil)
+        #expect(container.resolve(PatternExportService.self) != nil)
         print("✅ No deadlocks detected in service access patterns")
     }
 }

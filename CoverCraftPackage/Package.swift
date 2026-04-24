@@ -42,9 +42,6 @@ let package = Package(
             dependencies: [
                 "CoverCraftCore",
                 "CoverCraftDTO"
-            ],
-            exclude: [
-                "PolycamStyleARScanning.swift.disabled"
             ]
         ),
         
@@ -141,7 +138,9 @@ let package = Package(
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            resources: [.process("Fixtures")]
+            exclude: [
+                "Fixtures/README.md"
+            ]
         ),
         .testTarget(
             name: "CoverCraftSegmentationTests",
@@ -150,8 +149,7 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
+            ]
         ),
         .testTarget(
             name: "CoverCraftFlatteningTests",
@@ -160,8 +158,7 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
+            ]
         ),
         .testTarget(
             name: "CoverCraftExportTests",
@@ -170,18 +167,7 @@ let package = Package(
                 "CoverCraftCore",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
-        ),
-        .testTarget(
-            name: "CoverCraftUITests",
-            dependencies: [
-                "CoverCraftUI",
-                "CoverCraftCore",
-                "TestUtilities", 
-                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
+            ]
         ),
         .testTarget(
             name: "CoverCraftFeatureTests",
@@ -189,8 +175,7 @@ let package = Package(
                 "CoverCraftFeature",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-
+            ]
         ),
         
         // Integration and contract test targets
@@ -200,8 +185,7 @@ let package = Package(
                 "CoverCraftFeature",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
+            ]
         ),
         .testTarget(
             name: "ContractTests",
@@ -218,8 +202,7 @@ let package = Package(
                 "CoverCraftFeature",
                 "TestUtilities",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            resources: [.process("Fixtures")]
+            ]
         ),
         
         // Quality Assurance test targets
@@ -254,8 +237,7 @@ let package = Package(
                 "CoverCraftFlattening",
                 "CoverCraftExport",
                 "TestUtilities"
-            ],
-
+            ]
         )
     ]
 )

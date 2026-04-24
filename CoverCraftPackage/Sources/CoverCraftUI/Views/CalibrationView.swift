@@ -7,7 +7,6 @@ import CoverCraftCore
 import UIKit
 #endif
 
-/// Calibration method options for determining reference points
 enum CalibrationMethod: String, CaseIterable, Identifiable {
     case diagonal = "Bounding Box Diagonal"
     case xAxis = "X-Axis (Width)"
@@ -27,13 +26,23 @@ enum CalibrationMethod: String, CaseIterable, Identifiable {
         }
     }
 
+    var shortLabel: String {
+        switch self {
+        case .diagonal: return "Diagonal"
+        case .xAxis: return "Width"
+        case .yAxis: return "Height"
+        case .zAxis: return "Depth"
+        case .longestAxis: return "Longest"
+        }
+    }
+
     var description: String {
         switch self {
-        case .diagonal: return "Corner to corner (longest possible)"
+        case .diagonal: return "Corner to corner reference"
         case .xAxis: return "Left to right extent"
         case .yAxis: return "Bottom to top extent"
         case .zAxis: return "Front to back extent"
-        case .longestAxis: return "Automatically picks longest dimension"
+        case .longestAxis: return "Automatically picks the largest side"
         }
     }
 }
@@ -44,7 +53,7 @@ public struct CalibrationView: View {
     let mesh: MeshDTO?
     @Binding var calibrationData: CalibrationDTO
 
-    @State private var realWorldDistanceText: String = "1.0"
+    @State private var realWorldDistanceText = ""
     @State private var selectedMethod: CalibrationMethod = .longestAxis
     @State private var computedMeshDistance: Float = 0.0
     @Environment(\.dismiss) private var dismiss
@@ -56,33 +65,40 @@ public struct CalibrationView: View {
 
     public var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                headerSection
+            VStack(spacing: 18) {
+                heroCard
 
-                if let mesh = mesh {
-                    meshInfoSection(mesh: mesh)
-                    calibrationMethodSection
-                    distanceInputSection
-                    applyCalibrationButton
+                if let mesh {
+                    meshOverviewCard(mesh)
+                    methodSelectionCard
+                    distanceEntryCard
 
                     if calibrationData.isComplete {
-                        calibrationCompleteSection
+                        completionCard
                     }
                 } else {
-                    noMeshSection
+                    unavailableCard
                 }
 
-                Spacer(minLength: 20)
-                resetButton
+                Button("Reset Calibration") {
+                    calibrationData = CalibrationDTO.empty()
+                    realWorldDistanceText = ""
+                    selectedMethod = .longestAxis
+                }
+                .buttonStyle(.bordered)
+                .disabled(mesh == nil)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
+        .background(CoverCraftScreenBackground().ignoresSafeArea())
         .navigationTitle("Calibration")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear {
-            if calibrationData.realWorldDistance > 0 {
+            if calibrationData.isRealWorldDistanceSet && calibrationData.realWorldDistance > 0 {
                 realWorldDistanceText = String(format: "%.2f", calibrationData.realWorldDistance)
             }
             updateComputedDistance()
@@ -92,130 +108,172 @@ public struct CalibrationView: View {
         }
     }
 
-    // MARK: - View Sections
+    private var heroCard: some View {
+        CoverCraftCard(tone: calibrationData.isComplete ? .success : .accent) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    CoverCraftStatusChip(
+                        calibrationData.isComplete ? "Scale applied" : "Scale required",
+                        systemImage: calibrationData.isComplete ? "checkmark.seal.fill" : "ruler",
+                        tone: calibrationData.isComplete ? .success : .accent
+                    )
 
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("Calibration")
-                .font(.largeTitle)
-                .bold()
+                    Text("Calibrate the scan with one measured reference before generating the pattern.")
+                        .font(.title3.weight(.semibold))
 
-            Text("Select a reference dimension and enter its real-world measurement.")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private func meshInfoSection(mesh: MeshDTO) -> some View {
-        VStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.gray.opacity(0.15))
-
-                VStack(spacing: 8) {
-                    Image(systemName: "cube.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(.blue)
-
-                    Text("\(mesh.vertices.count) vertices")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    if let bounds = mesh.boundingBox() {
-                        let size = bounds.max - bounds.min
-                        VStack(spacing: 4) {
-                            Text("Mesh Dimensions (units)")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-
-                            HStack(spacing: 16) {
-                                dimensionLabel("X", value: size.x, color: .red)
-                                dimensionLabel("Y", value: size.y, color: .green)
-                                dimensionLabel("Z", value: size.z, color: .blue)
-                            }
-                        }
-                    }
+                    Text("Choose the most trustworthy dimension, then enter its real-world distance in meters.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .padding()
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "ruler.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.blue)
+                    .frame(width: 58, height: 58)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.blue.opacity(0.12))
+                    )
             }
-            .frame(height: 140)
         }
     }
 
-    private func dimensionLabel(_ axis: String, value: Float, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(axis)
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-            Text(String(format: "%.3f", value))
-                .font(.system(.caption, design: .monospaced))
+    private func meshOverviewCard(_ mesh: MeshDTO) -> some View {
+        let bounds = mesh.boundingBox()
+        let size = bounds.map { $0.max - $0.min }
+
+        return CoverCraftCard(tone: .neutral) {
+            CoverCraftSectionHeading(
+                step: "Mesh",
+                title: "Current Mesh",
+                subtitle: "Use the extents below to pick a reference that matches a real-world measurement.",
+                tone: .neutral
+            )
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 12
+            ) {
+                CoverCraftMetricTile(
+                    title: "Vertices",
+                    value: "\(mesh.vertices.count)",
+                    subtitle: "Captured points",
+                    systemImage: "point.3.connected.trianglepath.dotted",
+                    tone: .accent
+                )
+                CoverCraftMetricTile(
+                    title: "Triangles",
+                    value: "\(mesh.triangleCount)",
+                    subtitle: "Surface coverage",
+                    systemImage: "triangle",
+                    tone: .accent
+                )
+
+                if let size {
+                    CoverCraftMetricTile(
+                        title: "Width",
+                        value: String(format: "%.3f", size.x),
+                        subtitle: "Mesh units",
+                        systemImage: "arrow.left.and.right",
+                        tone: .neutral
+                    )
+                    CoverCraftMetricTile(
+                        title: "Height",
+                        value: String(format: "%.3f", size.y),
+                        subtitle: "Mesh units",
+                        systemImage: "arrow.up.and.down",
+                        tone: .neutral
+                    )
+                    CoverCraftMetricTile(
+                        title: "Depth",
+                        value: String(format: "%.3f", size.z),
+                        subtitle: "Mesh units",
+                        systemImage: "arrow.forward",
+                        tone: .neutral
+                    )
+                }
+            }
         }
     }
 
-    private var calibrationMethodSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Reference Dimension")
-                .font(.headline)
+    private var methodSelectionCard: some View {
+        CoverCraftCard(tone: .accent) {
+            CoverCraftSectionHeading(
+                step: "Step 1",
+                title: "Reference Dimension",
+                subtitle: "Pick the dimension you can measure most accurately in the physical object.",
+                statusTitle: selectedMethod.shortLabel,
+                statusImage: selectedMethod.icon,
+                tone: .accent
+            )
 
-            ForEach(CalibrationMethod.allCases) { method in
-                methodRow(method)
+            VStack(spacing: 10) {
+                ForEach(CalibrationMethod.allCases) { method in
+                    Button {
+                        selectedMethod = method
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: method.icon)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(selectedMethod == method ? .white : .blue)
+                                .frame(width: 24)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(method.rawValue)
+                                    .font(.headline)
+                                Text(method.description)
+                                    .font(.caption)
+                                    .foregroundStyle(selectedMethod == method ? Color.white.opacity(0.82) : .secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: selectedMethod == method ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selectedMethod == method ? .white : .secondary)
+                        }
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(selectedMethod == method ? Color.blue : Color.white.opacity(0.55))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(selectedMethod == method ? Color.blue.opacity(0.25) : Color.black.opacity(0.05), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             if computedMeshDistance > 0 {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.blue)
-                    Text("Selected dimension: \(String(format: "%.4f", computedMeshDistance)) mesh units")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 4)
+                CoverCraftStatusChip(
+                    "Selected length: \(String(format: "%.4f", computedMeshDistance)) mesh units",
+                    systemImage: "info.circle.fill",
+                    tone: .neutral
+                )
             }
         }
     }
 
-    private func methodRow(_ method: CalibrationMethod) -> some View {
-        Button {
-            selectedMethod = method
-        } label: {
-            HStack {
-                Image(systemName: method.icon)
-                    .frame(width: 24)
-                    .foregroundColor(selectedMethod == method ? .white : .blue)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(method.rawValue)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text(method.description)
-                        .font(.caption2)
-                        .foregroundColor(selectedMethod == method ? .white.opacity(0.8) : .secondary)
-                }
-
-                Spacer()
-
-                if selectedMethod == method {
-                    Image(systemName: "checkmark.circle.fill")
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(selectedMethod == method ? Color.blue : Color.gray.opacity(0.1))
+    private var distanceEntryCard: some View {
+        CoverCraftCard(tone: .accent) {
+            CoverCraftSectionHeading(
+                step: "Step 2",
+                title: "Enter Real Distance",
+                subtitle: "Use meters for the measured distance of the selected reference line.",
+                tone: .accent
             )
-            .foregroundColor(selectedMethod == method ? .white : .primary)
-        }
-        .buttonStyle(.plain)
-    }
 
-    private var distanceInputSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Real-World Distance")
-                .font(.headline)
+            HStack(spacing: 12) {
+                Image(systemName: "ruler.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.blue)
 
-            HStack {
                 TextField("Distance", text: $realWorldDistanceText)
                     .textFieldStyle(.roundedBorder)
                     #if os(iOS)
@@ -223,88 +281,95 @@ public struct CalibrationView: View {
                     #endif
 
                 Text("meters")
-                    .foregroundColor(.secondary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
 
-            Text("Enter the actual measurement of the selected dimension")
+            Text("Example: enter `1.25` for a 1.25 meter reference.")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
+
+            if !realWorldDistanceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               parsedRealWorldDistance == nil {
+                CoverCraftStatusChip(
+                    "Enter a positive distance in meters",
+                    systemImage: "exclamationmark.triangle.fill",
+                    tone: .warning
+                )
+            }
+
+            Button(action: applyCalibration) {
+                Label("Apply Calibration", systemImage: "checkmark.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+            .disabled(mesh == nil || computedMeshDistance <= 0 || parsedRealWorldDistance == nil)
         }
     }
 
-    private var applyCalibrationButton: some View {
-        Button(action: applyCalibration) {
-            HStack {
-                Image(systemName: "checkmark.circle")
-                Text("Apply Calibration")
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(mesh == nil || realWorldDistanceText.isEmpty)
-    }
+    private var completionCard: some View {
+        CoverCraftCard(tone: .success) {
+            CoverCraftSectionHeading(
+                step: "Done",
+                title: "Calibration Applied",
+                subtitle: "The scan now carries a real-world scale for flattening and export.",
+                statusTitle: "Ready",
+                statusImage: "checkmark.seal.fill",
+                tone: .success
+            )
 
-    private var calibrationCompleteSection: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundColor(.green)
-                Text("Calibration Applied")
-                    .font(.headline)
-                    .foregroundColor(.green)
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 12
+            ) {
+                CoverCraftMetricTile(
+                    title: "Scale factor",
+                    value: String(format: "%.6f", calibrationData.scaleFactor),
+                    subtitle: "Applied to the mesh",
+                    systemImage: "arrow.up.left.and.arrow.down.right",
+                    tone: .success
+                )
+                CoverCraftMetricTile(
+                    title: "Real distance",
+                    value: String(format: "%.3f m", calibrationData.realWorldDistance),
+                    subtitle: "Measured reference",
+                    systemImage: "ruler",
+                    tone: .success
+                )
             }
-
-            VStack(spacing: 4) {
-                Text("Scale factor: \(String(format: "%.6f", calibrationData.scaleFactor))")
-                    .font(.subheadline)
-                Text("Mesh distance: \(String(format: "%.4f", calibrationData.meshDistance)) units")
-                    .font(.caption)
-                Text("Real distance: \(String(format: "%.3f", calibrationData.realWorldDistance)) meters")
-                    .font(.caption)
-            }
-            .foregroundColor(.secondary)
 
             Button("Done") {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
-            .padding(.top, 8)
+            .tint(.green)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.green.opacity(0.1))
-        )
     }
 
-    private var noMeshSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
-                .foregroundColor(.orange)
-            Text("No mesh available for calibration")
-                .foregroundColor(.secondary)
-            Text("Scan an object first to enable calibration")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-    }
+    private var unavailableCard: some View {
+        CoverCraftCard(tone: .warning) {
+            CoverCraftSectionHeading(
+                step: "Unavailable",
+                title: "No Mesh Available",
+                subtitle: "A scan is required before calibration tools can do anything useful.",
+                statusTitle: "Blocked",
+                statusImage: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
 
-    private var resetButton: some View {
-        Button("Reset Calibration") {
-            calibrationData = CalibrationDTO.empty()
-            realWorldDistanceText = "1.0"
-            selectedMethod = .longestAxis
+            Text("Capture the object first, then return here to assign scale.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.bordered)
-        .disabled(mesh == nil)
     }
-
-    // MARK: - Calibration Logic
 
     private func updateComputedDistance() {
-        guard let mesh = mesh, let bounds = mesh.boundingBox() else {
+        guard let mesh, let bounds = mesh.boundingBox() else {
             computedMeshDistance = 0
             return
         }
@@ -325,8 +390,21 @@ public struct CalibrationView: View {
         }
     }
 
+    private var parsedRealWorldDistance: Double? {
+        let trimmedValue = realWorldDistanceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let distance = Double(trimmedValue), distance > 0 else {
+            return nil
+        }
+
+        return distance
+    }
+
     private func applyCalibration() {
-        guard let mesh = mesh, let bounds = mesh.boundingBox() else { return }
+        guard let mesh,
+              let bounds = mesh.boundingBox(),
+              let distance = parsedRealWorldDistance,
+              computedMeshDistance > 0
+        else { return }
 
         let size = bounds.max - bounds.min
         let point1: SIMD3<Float>
@@ -346,7 +424,6 @@ public struct CalibrationView: View {
             point1 = SIMD3<Float>((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, bounds.min.z)
             point2 = SIMD3<Float>((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, bounds.max.z)
         case .longestAxis:
-            // Pick the longest axis
             if size.x >= size.y && size.x >= size.z {
                 point1 = SIMD3<Float>(bounds.min.x, (bounds.min.y + bounds.max.y) / 2, (bounds.min.z + bounds.max.z) / 2)
                 point2 = SIMD3<Float>(bounds.max.x, (bounds.min.y + bounds.max.y) / 2, (bounds.min.z + bounds.max.z) / 2)
@@ -358,8 +435,6 @@ public struct CalibrationView: View {
                 point2 = SIMD3<Float>((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, bounds.max.z)
             }
         }
-
-        let distance = Double(realWorldDistanceText) ?? 1.0
 
         calibrationData = CalibrationDTO.with(
             firstPoint: point1,

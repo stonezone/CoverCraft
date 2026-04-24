@@ -8,9 +8,9 @@ import UniformTypeIdentifiers
 /// Test fixtures for export formats and sample output data
 @available(iOS 18.0, macOS 15.0, *)
 public struct ExportFixtures {
-    
+
     // MARK: - Export Format Configurations
-    
+
     /// PDF export configuration for pattern printing
     public static let pdfPatternConfig = ExportConfiguration(
         format: .pdf,
@@ -24,7 +24,7 @@ public struct ExportFixtures {
         colorMode: .rgb,
         paperSize: .usLetter
     )
-    
+
     /// SVG export configuration for digital patterns
     public static let svgDigitalConfig = ExportConfiguration(
         format: .svg,
@@ -38,7 +38,7 @@ public struct ExportFixtures {
         colorMode: .rgb,
         paperSize: .custom
     )
-    
+
     /// PNG export configuration for preview images
     public static let pngPreviewConfig = ExportConfiguration(
         format: .png,
@@ -52,7 +52,7 @@ public struct ExportFixtures {
         colorMode: .rgb,
         paperSize: .custom
     )
-    
+
     /// JPEG export configuration for thumbnails
     public static let jpegThumbnailConfig = ExportConfiguration(
         format: .jpeg,
@@ -67,7 +67,7 @@ public struct ExportFixtures {
         paperSize: .custom,
         compressionQuality: 0.8
     )
-    
+
     /// High-resolution PDF for professional printing
     public static let professionalPrintConfig = ExportConfiguration(
         format: .pdf,
@@ -81,7 +81,7 @@ public struct ExportFixtures {
         colorMode: .cmyk,
         paperSize: .a4
     )
-    
+
     /// Draft mode configuration for quick previews
     public static let draftModeConfig = ExportConfiguration(
         format: .png,
@@ -96,9 +96,9 @@ public struct ExportFixtures {
         paperSize: .custom,
         compressionQuality: 0.5
     )
-    
+
     // MARK: - Sample Export Data
-    
+
     /// Sample PDF data (minimal valid PDF)
     public static let samplePDFData: Data = {
         let pdfString = """%PDF-1.4
@@ -141,11 +141,11 @@ endobj
 
 xref
 0 5
-0000000000 65535 f 
-0000000010 00000 n 
-0000000053 00000 n 
-0000000108 00000 n 
-0000000178 00000 n 
+0000000000 65535 f
+0000000010 00000 n
+0000000053 00000 n
+0000000108 00000 n
+0000000178 00000 n
 trailer
 <<
 /Size 5
@@ -156,7 +156,7 @@ startxref
 %%EOF"""
         return pdfString.data(using: .utf8) ?? Data()
     }()
-    
+
     /// Sample SVG data (simple rectangle pattern)
     public static let sampleSVGData: Data = {
         let svgString = """<?xml version="1.0" encoding="UTF-8"?>
@@ -180,7 +180,7 @@ startxref
 </svg>"""
         return svgString.data(using: .utf8) ?? Data()
     }()
-    
+
     /// Sample PNG data (1x1 pixel red PNG)
     public static let samplePNGData: Data = {
         // Minimal 1x1 red PNG file
@@ -202,7 +202,7 @@ startxref
         ]
         return Data(bytes)
     }()
-    
+
     /// Sample JPEG data (minimal valid JPEG)
     public static let sampleJPEGData: Data = {
         // Minimal JPEG structure
@@ -223,9 +223,9 @@ startxref
         ]
         return Data(bytes)
     }()
-    
+
     // MARK: - Pattern Template Data
-    
+
     /// T-shirt pattern template metadata
     public static let tshirtTemplate = PatternTemplate(
         name: "Basic T-Shirt",
@@ -249,7 +249,7 @@ startxref
         tags: ["casual", "knit", "basic", "everyday"],
         version: "1.0"
     )
-    
+
     /// Dress pattern template
     public static let dressTemplate = PatternTemplate(
         name: "A-Line Dress",
@@ -273,7 +273,7 @@ startxref
         tags: ["dress", "woven", "formal", "fitted"],
         version: "1.2"
     )
-    
+
     /// Bag pattern template
     public static let bagTemplate = PatternTemplate(
         name: "Tote Bag",
@@ -297,9 +297,9 @@ startxref
         tags: ["bag", "canvas", "utility", "everyday"],
         version: "1.0"
     )
-    
+
     // MARK: - Export Result Test Cases
-    
+
     /// Successful export result
     public static let successfulExport = ExportResult(
         isSuccess: true,
@@ -319,7 +319,7 @@ startxref
         ),
         error: nil
     )
-    
+
     /// Failed export result (file write error)
     public static let failedExport = ExportResult(
         isSuccess: false,
@@ -331,7 +331,7 @@ startxref
         metadata: nil,
         error: ExportError.fileWriteError("Permission denied")
     )
-    
+
     /// Export with warnings
     public static let exportWithWarnings = ExportResult(
         isSuccess: true,
@@ -352,9 +352,9 @@ startxref
         error: nil,
         warnings: ["Panel 'small_detail' was too small to export"]
     )
-    
+
     // MARK: - Paper Sizes and Layout
-    
+
     /// US Letter paper size
     public static let usLetterPaper = PaperSize(
         name: "US Letter",
@@ -362,7 +362,7 @@ startxref
         height: 792.0, // 11 inches * 72 points
         margins: PaperMargins(top: 36, bottom: 36, left: 36, right: 36)
     )
-    
+
     /// A4 paper size
     public static let a4Paper = PaperSize(
         name: "A4",
@@ -370,7 +370,7 @@ startxref
         height: 842.0, // 297mm
         margins: PaperMargins(top: 28, bottom: 28, left: 28, right: 28)
     )
-    
+
     /// A3 paper size (for large patterns)
     public static let a3Paper = PaperSize(
         name: "A3",
@@ -378,7 +378,7 @@ startxref
         height: 1191.0, // 420mm
         margins: PaperMargins(top: 36, bottom: 36, left: 36, right: 36)
     )
-    
+
     /// Legal paper size
     public static let legalPaper = PaperSize(
         name: "Legal",
@@ -386,7 +386,7 @@ startxref
         height: 1008.0, // 14 inches
         margins: PaperMargins(top: 36, bottom: 36, left: 36, right: 36)
     )
-    
+
     /// Tabloid/Ledger paper size
     public static let tabloidPaper = PaperSize(
         name: "Tabloid",
@@ -394,9 +394,9 @@ startxref
         height: 1224.0, // 17 inches
         margins: PaperMargins(top: 36, bottom: 36, left: 36, right: 36)
     )
-    
+
     // MARK: - Collections
-    
+
     /// All export configurations
     public static let allExportConfigs: [ExportConfiguration] = [
         pdfPatternConfig,
@@ -406,14 +406,14 @@ startxref
         professionalPrintConfig,
         draftModeConfig
     ]
-    
+
     /// All pattern templates
     public static let allPatternTemplates: [PatternTemplate] = [
         tshirtTemplate,
         dressTemplate,
         bagTemplate
     ]
-    
+
     /// All paper sizes
     public static let allPaperSizes: [PaperSize] = [
         usLetterPaper,
@@ -422,14 +422,14 @@ startxref
         legalPaper,
         tabloidPaper
     ]
-    
+
     /// All export results (for testing different outcomes)
     public static let allExportResults: [ExportResult] = [
         successfulExport,
         failedExport,
         exportWithWarnings
     ]
-    
+
     /// Sample export data by format
     public static let sampleDataByFormat: [ExportFormat: Data] = [
         .pdf: samplePDFData,
@@ -437,9 +437,9 @@ startxref
         .png: samplePNGData,
         .jpeg: sampleJPEGData
     ]
-    
+
     // MARK: - Factory Methods
-    
+
     /// Create export configuration for specific format
     public static func configurationFor(format: ExportFormat) -> ExportConfiguration {
         switch format {
@@ -453,7 +453,7 @@ startxref
             return jpegThumbnailConfig
         }
     }
-    
+
     /// Create configuration with custom size
     public static func configurationWithSize(
         _ size: CGSize,
@@ -472,12 +472,12 @@ startxref
             paperSize: .custom
         )
     }
-    
+
     /// Get sample data for format
     public static func sampleData(for format: ExportFormat) -> Data {
         sampleDataByFormat[format] ?? Data()
     }
-    
+
     /// Create successful export result with custom data
     public static func successfulExportResult(
         data: Data,
@@ -503,7 +503,7 @@ startxref
             error: nil
         )
     }
-    
+
     /// Create failed export result with specific error
     public static func failedExportResult(error: ExportError) -> ExportResult {
         ExportResult(
@@ -535,7 +535,7 @@ public struct ExportConfiguration: Sendable, Codable, Equatable {
     public let colorMode: ColorMode
     public let paperSize: PaperSizeType
     public let compressionQuality: Double?
-    
+
     public init(
         format: ExportFormat,
         outputSize: CGSize,
@@ -570,11 +570,11 @@ public enum ExportFormat: String, Sendable, Codable, CaseIterable {
     case svg = "svg"
     case png = "png"
     case jpeg = "jpeg"
-    
+
     public var fileExtension: String {
         return rawValue
     }
-    
+
     public var mimeType: String {
         switch self {
         case .pdf: return "application/pdf"
@@ -583,7 +583,7 @@ public enum ExportFormat: String, Sendable, Codable, CaseIterable {
         case .jpeg: return "image/jpeg"
         }
     }
-    
+
     public var utType: UTType {
         switch self {
         case .pdf: return .pdf
@@ -628,7 +628,7 @@ public struct PatternTemplate: Sendable, Codable, Equatable {
     public let tools: [String]
     public let tags: [String]
     public let version: String
-    
+
     public init(
         name: String,
         category: PatternCategory,
@@ -686,7 +686,7 @@ public struct ExportResult: Sendable, Equatable {
     public let metadata: ExportMetadata?
     public let error: ExportError?
     public let warnings: [String]?
-    
+
     public init(
         isSuccess: Bool,
         outputData: Data?,
@@ -720,7 +720,7 @@ public struct ExportMetadata: Sendable, Codable, Equatable {
     public let dimensions: CGSize
     public let colorProfile: String
     public let compression: String?
-    
+
     public init(
         originalPanelCount: Int,
         exportedPanelCount: Int,
@@ -758,7 +758,7 @@ public struct PaperSize: Sendable, Codable, Equatable {
     public let width: Double
     public let height: Double
     public let margins: PaperMargins
-    
+
     public init(name: String, width: Double, height: Double, margins: PaperMargins) {
         self.name = name
         self.width = width
@@ -773,7 +773,7 @@ public struct PaperMargins: Sendable, Codable, Equatable {
     public let bottom: Double
     public let left: Double
     public let right: Double
-    
+
     public init(top: Double, bottom: Double, left: Double, right: Double) {
         self.top = top
         self.bottom = bottom

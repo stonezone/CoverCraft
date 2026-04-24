@@ -7,7 +7,8 @@ import Logging
 import CoverCraftCore
 import CoverCraftDTO
 
-/// Deterministic RNG seeded from mesh.id so same mesh produces same segmentation
+/// Deterministic RNG seeded from mesh.id so same mesh produces same segmentation.
+/// Do not use `Hashable.hashValue` here; Swift intentionally randomizes hash seeds per process.
 private struct SeededRNG: RandomNumberGenerator {
     var state: UInt64
     mutating func next() -> UInt64 {
@@ -96,8 +97,8 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
             logger.warning("Large mesh detected (\(mesh.triangleCount) triangles), may require significant memory")
         }
         
-        // Seed RNG from mesh.id so same mesh produces identical segmentation
-        var rng = SeededRNG(state: UInt64(truncatingIfNeeded: mesh.id.hashValue) | 1)
+        // Seed RNG from mesh.id so same mesh produces identical segmentation.
+        var rng = SeededRNG(state: Self.deterministicSeed(for: mesh.id))
 
         let panels = try await performEnhancedSegmentation(
             mesh: mesh,
@@ -112,6 +113,26 @@ public final class DefaultMeshSegmentationService: MeshSegmentationService {
         logger.info("Enhanced segmentation completed in \(String(format: "%.3f", duration))s with \(panels.count) panels")
         
         return panels
+    }
+
+    static func deterministicSeed(for meshID: UUID) -> UInt64 {
+        let uuid = meshID.uuid
+        let bytes: [UInt8] = [
+            uuid.0, uuid.1, uuid.2, uuid.3,
+            uuid.4, uuid.5, uuid.6, uuid.7,
+            uuid.8, uuid.9, uuid.10, uuid.11,
+            uuid.12, uuid.13, uuid.14, uuid.15
+        ]
+
+        // FNV-1a over UUID bytes: stable across process launches and platforms.
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in bytes {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+
+        // Keep the LCG state non-zero and odd.
+        return hash | 1
     }
     
     public func previewSegmentation(_ mesh: MeshDTO, resolution: SegmentationResolution) async throws -> [PanelDTO] {

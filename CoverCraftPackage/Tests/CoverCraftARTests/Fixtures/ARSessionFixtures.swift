@@ -55,7 +55,7 @@ public struct ARSessionFixtures {
     /// Camera at 45-degree angle
     public static let angledPose = CameraExtrinsics(
         position: SIMD3<Float>(0.5, 0.7, 0.5),
-        rotation: simd_quatf(angle: Float.pi/4, axis: SIMD3<Float>(1, 0, 1).normalized),
+        rotation: simd_quatf(angle: Float.pi/4, axis: simd_normalize(SIMD3<Float>(1, 0, 1))),
         timestamp: Date(timeIntervalSince1970: 1609459200)
     )
     

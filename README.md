@@ -1,6 +1,6 @@
-# CoverCraft - iOS App
+# CoverCraft
 
-A modern iOS application using a **workspace + SPM package** architecture for clean separation between app shell and feature code.
+CoverCraft is an iOS 18+ Swift app for generating sewing-pattern exports from either a LiDAR scan or manual furniture dimensions. The app shell is intentionally thin; production code lives in the Swift package modules.
 
 ## Project Architecture
 
@@ -12,10 +12,10 @@ CoverCraft/
 │   ├── Assets.xcassets/                # App-level assets (icons, colors)
 │   ├── CoverCraftApp.swift              # App entry point
 │   └── CoverCraft.xctestplan            # Test configuration
-├── CoverCraftPackage/                   # 🚀 Primary development area
-│   ├── Package.swift                   # Package configuration
-│   ├── Sources/CoverCraftFeature/       # Your feature code
-│   └── Tests/CoverCraftFeatureTests/    # Unit tests
+├── CoverCraftPackage/                   # Primary development area
+│   ├── Package.swift                    # Package configuration
+│   ├── Sources/                         # DTO/Core/AR/Segmentation/Flattening/Export/UI/Feature
+│   └── Tests/                           # Swift Testing targets and fixtures
 └── CoverCraftUITests/                   # UI automation tests
 ```
 
@@ -23,8 +23,25 @@ CoverCraft/
 
 ### Workspace + SPM Structure
 - **App Shell**: `CoverCraft/` contains minimal app lifecycle code
-- **Feature Code**: `CoverCraftPackage/Sources/CoverCraftFeature/` is where most development happens
-- **Separation**: Business logic lives in the SPM package, app target just imports and displays it
+- **Package Code**: `CoverCraftPackage/Sources/` contains the actual modules
+- **Separation**: business logic lives in the Swift package; the app target imports `CoverCraftFeature`
+
+### Module Flow
+Keep dependencies one-way:
+
+```
+CoverCraftDTO -> CoverCraftCore -> domain modules/UI -> CoverCraftFeature
+```
+
+Current modules:
+- `CoverCraftDTO`: immutable data contracts
+- `CoverCraftCore`: protocols, dependency container, services, slipcover generation
+- `CoverCraftAR`: ARKit scanning integration
+- `CoverCraftSegmentation`: mesh-to-panel segmentation
+- `CoverCraftFlattening`: 3D-to-2D panel flattening and validation
+- `CoverCraftExport`: PDF/SVG/PNG export
+- `CoverCraftUI`: reusable SwiftUI screens and components
+- `CoverCraftFeature`: app workflow orchestration
 
 ### Buildable Folders (Xcode 16)
 - Files added to the filesystem automatically appear in Xcode
@@ -34,7 +51,7 @@ CoverCraft/
 ## Development Notes
 
 ### Code Organization
-Most development happens in `CoverCraftPackage/Sources/CoverCraftFeature/` - organize your code as you prefer.
+Make changes in the module that owns the behavior. Keep cross-module APIs `public` with explicit `public init` declarations.
 
 ### Public API Requirements
 Types exposed to the app target need `public` access:
@@ -63,9 +80,17 @@ targets: [
 ```
 
 ### Test Structure
-- **Unit Tests**: `CoverCraftPackage/Tests/CoverCraftFeatureTests/` (Swift Testing framework)
+- **Package Tests**: `CoverCraftPackage/Tests/<TargetName>/` (Swift Testing framework)
 - **UI Tests**: `CoverCraftUITests/` (XCUITest framework)
-- **Test Plan**: `CoverCraft.xctestplan` coordinates all tests
+- **Test Plan**: `CoverCraft/CoverCraft.xctestplan` coordinates package and UI tests
+
+Useful commands:
+
+```bash
+swift build --package-path CoverCraftPackage
+swift test --package-path CoverCraftPackage
+xcodebuild -workspace CoverCraft.xcworkspace -scheme CoverCraft -testPlan CoverCraft -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
 
 ## Configuration
 
@@ -98,7 +123,7 @@ To include assets in your feature package:
 
 ## Documentation
 
-For API documentation, refer to the source code and inline comments in `CoverCraftPackage/Sources/`.
+For active project guidance, use `AGENTS.md`, `CLAUDE.md`, and inline source comments. Historical plans and review artifacts live under `docs/archive/`.
 
 ### Generated with XcodeBuildMCP
 This project was scaffolded using [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP), which provides tools for AI-assisted iOS development workflows.

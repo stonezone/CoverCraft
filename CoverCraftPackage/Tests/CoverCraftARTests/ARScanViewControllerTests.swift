@@ -464,7 +464,7 @@ private enum ARSessionState {
 struct ARScanViewControllerTestsSkipped {
     @Test("Skipped on non-iOS platforms")
     func testSkipped() async throws {
-        #expect(true) // Pass - tests skipped on non-iOS platforms
+        // Intentionally empty: AR scan view controller requires iOS platform APIs.
     }
 }
 #endif

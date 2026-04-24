@@ -8,9 +8,9 @@ import CoverCraftDTO
 /// Test fixtures for FlattenedPanelDTO objects covering various flattening scenarios
 @available(iOS 18.0, macOS 15.0, *)
 public struct FlattenedPanelFixtures {
-    
+
     // MARK: - Basic Flattened Shapes
-    
+
     /// Simple rectangular flattened panel (10cm x 15cm)
     public static let rectangularFlattened = FlattenedPanelDTO(
         points2D: [
@@ -31,7 +31,7 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781234")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Triangular flattened panel
     public static let triangularFlattened = FlattenedPanelDTO(
         points2D: [
@@ -50,13 +50,13 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781235")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Complex polygon (hexagon)
     public static let hexagonFlattened = FlattenedPanelDTO(
         points2D: [
             CGPoint(x: 50.0, y: 0.0),     // Bottom right
             CGPoint(x: 100.0, y: 25.0),   // Right
-            CGPoint(x: 100.0, y: 75.0),   // Top right  
+            CGPoint(x: 100.0, y: 75.0),   // Top right
             CGPoint(x: 50.0, y: 100.0),   // Top left
             CGPoint(x: 0.0, y: 75.0),     // Left
             CGPoint(x: 0.0, y: 25.0)      // Bottom left
@@ -75,9 +75,9 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781236")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     // MARK: - T-Shirt Flattened Panels
-    
+
     /// Front torso panel flattened
     public static let frontTorsoFlattened = FlattenedPanelDTO(
         points2D: [
@@ -107,7 +107,7 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781237")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Back torso panel flattened
     public static let backTorsoFlattened = FlattenedPanelDTO(
         points2D: [
@@ -136,7 +136,7 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781238")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Left sleeve flattened
     public static let leftSleeveFlattened = FlattenedPanelDTO(
         points2D: [
@@ -165,7 +165,7 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781239")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Right sleeve flattened (mirrored)
     public static let rightSleeveFlattened = FlattenedPanelDTO(
         points2D: [
@@ -194,9 +194,9 @@ public struct FlattenedPanelFixtures {
         originalPanelId: UUID(uuidString: "PNL12345-1234-1234-1234-123456781240")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     // MARK: - Edge Cases and Error Scenarios
-    
+
     /// Empty flattened panel (no points or edges)
     public static let emptyFlattened = FlattenedPanelDTO(
         points2D: [],
@@ -206,7 +206,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781241")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Single point (degenerate)
     public static let singlePointFlattened = FlattenedPanelDTO(
         points2D: [CGPoint(x: 50.0, y: 50.0)],
@@ -216,7 +216,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781242")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Two points only (line segment)
     public static let lineSegmentFlattened = FlattenedPanelDTO(
         points2D: [
@@ -231,7 +231,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781243")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Invalid edge indices (out of bounds)
     public static let invalidEdgeIndices = FlattenedPanelDTO(
         points2D: [
@@ -247,7 +247,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781244")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Zero scale factor (invalid)
     public static let zeroScaleFlattened = FlattenedPanelDTO(
         points2D: [
@@ -265,7 +265,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781245")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Negative scale factor (invalid)
     public static let negativeScaleFlattened = FlattenedPanelDTO(
         points2D: [
@@ -283,9 +283,9 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781246")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     // MARK: - Different Scale Test Cases
-    
+
     /// Millimeter scale (1000 units per meter)
     public static let millimeterScale = FlattenedPanelDTO(
         points2D: [
@@ -305,7 +305,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781247")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Centimeter scale (100 units per meter)
     public static let centimeterScale = FlattenedPanelDTO(
         points2D: [
@@ -325,7 +325,7 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781248")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     /// Inch scale (39.37 units per meter)
     public static let inchScale = FlattenedPanelDTO(
         points2D: [
@@ -345,9 +345,9 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781249")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     // MARK: - Edge Type Test Cases
-    
+
     /// Panel with all edge types
     public static let allEdgeTypesPanel = FlattenedPanelDTO(
         points2D: [
@@ -372,15 +372,15 @@ public struct FlattenedPanelFixtures {
         id: UUID(uuidString: "FLT12345-1234-1234-1234-123456781250")!,
         createdAt: Date(timeIntervalSince1970: 1609459200)
     )
-    
+
     // MARK: - Large Scale Test Cases
-    
+
     /// Large panel for performance testing
     public static let largeFlattened: FlattenedPanelDTO = {
         let numPoints = 100
         var points: [CGPoint] = []
         var edges: [EdgeDTO] = []
-        
+
         // Create circular pattern
         for i in 0..<numPoints {
             let angle = Double(i) * 2.0 * Double.pi / Double(numPoints)
@@ -388,12 +388,12 @@ public struct FlattenedPanelFixtures {
             let x = radius * cos(angle) + 250.0 // Offset to positive quadrant
             let y = radius * sin(angle) + 250.0
             points.append(CGPoint(x: x, y: y))
-            
+
             // Connect to next point (last connects to first)
             let nextIndex = (i + 1) % numPoints
             edges.append(EdgeDTO(startIndex: i, endIndex: nextIndex, type: .cutLine))
         }
-        
+
         return FlattenedPanelDTO(
             points2D: points,
             edges: edges,
@@ -403,9 +403,9 @@ public struct FlattenedPanelFixtures {
             createdAt: Date(timeIntervalSince1970: 1609459200)
         )
     }()
-    
+
     // MARK: - Collections
-    
+
     /// All valid flattened panels
     public static let validFlattenedPanels: [FlattenedPanelDTO] = [
         rectangularFlattened,
@@ -421,7 +421,7 @@ public struct FlattenedPanelFixtures {
         allEdgeTypesPanel,
         largeFlattened
     ]
-    
+
     /// All invalid flattened panels
     public static let invalidFlattenedPanels: [FlattenedPanelDTO] = [
         emptyFlattened,
@@ -430,17 +430,17 @@ public struct FlattenedPanelFixtures {
         zeroScaleFlattened,
         negativeScaleFlattened
     ]
-    
+
     /// Edge case panels
     public static let edgeCaseFlattenedPanels: [FlattenedPanelDTO] = [
         lineSegmentFlattened,
         largeFlattened
     ]
-    
+
     /// All flattened panels combined
-    public static let allFlattenedPanels: [FlattenedPanelDTO] = 
+    public static let allFlattenedPanels: [FlattenedPanelDTO] =
         validFlattenedPanels + invalidFlattenedPanels + edgeCaseFlattenedPanels
-    
+
     /// T-shirt flattened panel set
     public static let tshirtFlattenedSet: [FlattenedPanelDTO] = [
         frontTorsoFlattened,
@@ -448,23 +448,23 @@ public struct FlattenedPanelFixtures {
         leftSleeveFlattened,
         rightSleeveFlattened
     ]
-    
+
     /// Basic geometric shapes flattened
     public static let basicFlattenedShapes: [FlattenedPanelDTO] = [
         rectangularFlattened,
         triangularFlattened,
         hexagonFlattened
     ]
-    
+
     /// Different scale examples
     public static let scaleExamples: [FlattenedPanelDTO] = [
         millimeterScale,
         centimeterScale,
         inchScale
     ]
-    
+
     // MARK: - Factory Methods
-    
+
     /// Create square flattened panel with specified size
     public static func squareFlattened(size: Double, scale: Double = 1000.0) -> FlattenedPanelDTO {
         FlattenedPanelDTO(
@@ -488,7 +488,7 @@ public struct FlattenedPanelFixtures {
             scaleUnitsPerMeter: scale
         )
     }
-    
+
     /// Create regular polygon flattened panel
     public static func regularPolygonFlattened(
         sides: Int,
@@ -497,17 +497,17 @@ public struct FlattenedPanelFixtures {
     ) -> FlattenedPanelDTO {
         var points: [CGPoint] = []
         var edges: [EdgeDTO] = []
-        
+
         for i in 0..<sides {
             let angle = Double(i) * 2.0 * Double.pi / Double(sides)
             let x = radius * cos(angle) + radius // Offset to positive quadrant
             let y = radius * sin(angle) + radius
             points.append(CGPoint(x: x, y: y))
-            
+
             let nextIndex = (i + 1) % sides
             edges.append(EdgeDTO(startIndex: i, endIndex: nextIndex, type: .cutLine))
         }
-        
+
         return FlattenedPanelDTO(
             points2D: points,
             edges: edges,
@@ -519,12 +519,12 @@ public struct FlattenedPanelFixtures {
             scaleUnitsPerMeter: scale
         )
     }
-    
+
     /// Get random valid flattened panel
     public static func randomValidFlattenedPanel() -> FlattenedPanelDTO {
         validFlattenedPanels.randomElement() ?? rectangularFlattened
     }
-    
+
     /// Create flattened panel with specific edge type
     public static func flattenedPanelWithEdgeType(_ edgeType: EdgeType) -> FlattenedPanelDTO {
         FlattenedPanelDTO(

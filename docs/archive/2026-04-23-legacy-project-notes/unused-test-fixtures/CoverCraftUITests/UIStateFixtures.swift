@@ -7,9 +7,9 @@ import SwiftUI
 /// Test fixtures for UI state management and navigation scenarios
 @available(iOS 18.0, macOS 15.0, *)
 public struct UIStateFixtures {
-    
+
     // MARK: - App State Fixtures
-    
+
     /// Fresh app launch state (onboarding required)
     public static let freshLaunchState = AppState(
         isFirstLaunch: true,
@@ -22,7 +22,7 @@ public struct UIStateFixtures {
         error: nil,
         deviceCapabilities: DeviceCapabilities.iphone15Pro
     )
-    
+
     /// Returning user state (has used app before)
     public static let returningUserState = AppState(
         isFirstLaunch: false,
@@ -35,7 +35,7 @@ public struct UIStateFixtures {
         error: nil,
         deviceCapabilities: DeviceCapabilities.iphone15Pro
     )
-    
+
     /// Loading state during scan
     public static let scanningState = AppState(
         isFirstLaunch: false,
@@ -53,7 +53,7 @@ public struct UIStateFixtures {
             message: "Capturing 3D mesh..."
         )
     )
-    
+
     /// Error state (AR not supported)
     public static let errorState = AppState(
         isFirstLaunch: false,
@@ -66,7 +66,7 @@ public struct UIStateFixtures {
         error: .arNotSupported("This device does not support ARKit"),
         deviceCapabilities: DeviceCapabilities.iPadPro
     )
-    
+
     /// Deep navigation state (user is deep in editing)
     public static let deepNavigationState = AppState(
         isFirstLaunch: false,
@@ -79,9 +79,9 @@ public struct UIStateFixtures {
         error: nil,
         deviceCapabilities: DeviceCapabilities.iphone15Pro
     )
-    
+
     // MARK: - Scan State Fixtures
-    
+
     /// Initial scan setup
     public static let initialScanState = ScanState(
         phase: .setup,
@@ -94,7 +94,7 @@ public struct UIStateFixtures {
         environmentLighting: nil,
         lastUpdate: Date()
     )
-    
+
     /// Active scanning in progress
     public static let activeScanningState = ScanState(
         phase: .scanning,
@@ -114,7 +114,7 @@ public struct UIStateFixtures {
             message: "Move around the object to capture all angles"
         )
     )
-    
+
     /// Scan completed, processing
     public static let processingState = ScanState(
         phase: .processing,
@@ -135,7 +135,7 @@ public struct UIStateFixtures {
             message: "Processing mesh data..."
         )
     )
-    
+
     /// Scan completed successfully
     public static let completedScanState = ScanState(
         phase: .completed,
@@ -152,7 +152,7 @@ public struct UIStateFixtures {
         environmentLighting: ARSessionFixtures.brightIndoorLighting,
         lastUpdate: Date()
     )
-    
+
     /// Scan failed state
     public static let failedScanState = ScanState(
         phase: .failed,
@@ -166,9 +166,9 @@ public struct UIStateFixtures {
         lastUpdate: Date(),
         error: .trackingLost("AR tracking was lost")
     )
-    
+
     // MARK: - Project State Fixtures
-    
+
     /// Empty projects list
     public static let emptyProjectsState = ProjectsState(
         projects: [],
@@ -178,7 +178,7 @@ public struct UIStateFixtures {
         sortOption: .dateModified,
         filterOption: .all
     )
-    
+
     /// Projects list with data
     public static let populatedProjectsState = ProjectsState(
         projects: ProjectFixtures.sampleProjects,
@@ -188,7 +188,7 @@ public struct UIStateFixtures {
         sortOption: .name,
         filterOption: .all
     )
-    
+
     /// Loading projects state
     public static let loadingProjectsState = ProjectsState(
         projects: [],
@@ -198,7 +198,7 @@ public struct UIStateFixtures {
         sortOption: .dateModified,
         filterOption: .all
     )
-    
+
     /// Searching projects state
     public static let searchingProjectsState = ProjectsState(
         projects: ProjectFixtures.sampleProjects.filter { $0.name.contains("Shirt") },
@@ -208,9 +208,9 @@ public struct UIStateFixtures {
         sortOption: .name,
         filterOption: .all
     )
-    
+
     // MARK: - Panel Editor State Fixtures
-    
+
     /// Editing front torso panel
     public static let editingFrontPanelState = PanelEditorState(
         panel: PanelFixtures.frontTorso,
@@ -226,7 +226,7 @@ public struct UIStateFixtures {
         undoStack: [],
         redoStack: []
     )
-    
+
     /// View-only panel state
     public static let viewOnlyPanelState = PanelEditorState(
         panel: PanelFixtures.triangularPanel,
@@ -242,7 +242,7 @@ public struct UIStateFixtures {
         undoStack: [],
         redoStack: []
     )
-    
+
     /// Multiple points selected
     public static let multiSelectPanelState = PanelEditorState(
         panel: PanelFixtures.complexPolygonPanel,
@@ -260,9 +260,9 @@ public struct UIStateFixtures {
         ],
         redoStack: []
     )
-    
+
     // MARK: - Settings State Fixtures
-    
+
     /// Default settings state
     public static let defaultSettingsState = SettingsState(
         theme: .system,
@@ -279,7 +279,7 @@ public struct UIStateFixtures {
             shareUsageData: false
         )
     )
-    
+
     /// Customized settings state
     public static let customizedSettingsState = SettingsState(
         theme: .dark,
@@ -296,9 +296,9 @@ public struct UIStateFixtures {
             shareUsageData: true
         )
     )
-    
+
     // MARK: - Device Capabilities Fixtures
-    
+
     /// iPhone 15 Pro capabilities
     public static let iphone15ProCapabilities = DeviceCapabilities(
         deviceModel: "iPhone15,2",
@@ -314,7 +314,7 @@ public struct UIStateFixtures {
         screenScale: 3.0,
         supportsDynamicIsland: true
     )
-    
+
     /// iPad Pro capabilities
     public static let iPadProCapabilities = DeviceCapabilities(
         deviceModel: "iPad13,8",
@@ -330,7 +330,7 @@ public struct UIStateFixtures {
         screenScale: 2.0,
         supportsDynamicIsland: false
     )
-    
+
     /// iPhone SE (limited capabilities)
     public static let iphoneSECapabilities = DeviceCapabilities(
         deviceModel: "iPhone14,6",
@@ -346,9 +346,9 @@ public struct UIStateFixtures {
         screenScale: 2.0,
         supportsDynamicIsland: false
     )
-    
+
     // MARK: - Collections
-    
+
     /// All app state fixtures
     public static let allAppStates: [AppState] = [
         freshLaunchState,
@@ -357,7 +357,7 @@ public struct UIStateFixtures {
         errorState,
         deepNavigationState
     ]
-    
+
     /// All scan state fixtures
     public static let allScanStates: [ScanState] = [
         initialScanState,
@@ -366,23 +366,23 @@ public struct UIStateFixtures {
         completedScanState,
         failedScanState
     ]
-    
+
     /// All panel editor states
     public static let allPanelEditorStates: [PanelEditorState] = [
         editingFrontPanelState,
         viewOnlyPanelState,
         multiSelectPanelState
     ]
-    
+
     /// All device capabilities
     public static let allDeviceCapabilities: [DeviceCapabilities] = [
         iphone15ProCapabilities,
         iPadProCapabilities,
         iphoneSECapabilities
     ]
-    
+
     // MARK: - Factory Methods
-    
+
     /// Create app state with specific project
     public static func appStateWithProject(_ project: Project) -> AppState {
         AppState(
@@ -397,7 +397,7 @@ public struct UIStateFixtures {
             deviceCapabilities: iphone15ProCapabilities
         )
     }
-    
+
     /// Create scan state with specific phase
     public static func scanStateWithPhase(_ phase: ScanPhase) -> ScanState {
         switch phase {
@@ -413,7 +413,7 @@ public struct UIStateFixtures {
             return failedScanState
         }
     }
-    
+
     /// Create panel editor state with specific tool
     public static func panelEditorStateWithTool(_ tool: EditorTool) -> PanelEditorState {
         PanelEditorState(
@@ -431,7 +431,7 @@ public struct UIStateFixtures {
             redoStack: []
         )
     }
-    
+
     /// Get random app state for testing
     public static func randomAppState() -> AppState {
         allAppStates.randomElement() ?? freshLaunchState
@@ -442,7 +442,7 @@ public struct UIStateFixtures {
 
 @available(iOS 18.0, macOS 15.0, *)
 public struct ProjectFixtures {
-    
+
     /// Basic t-shirt project
     public static let basicTshirtProject = Project(
         id: UUID(uuidString: "PROJ1234-1234-1234-1234-123456781234")!,
@@ -458,7 +458,7 @@ public struct ProjectFixtures {
         tags: ["apparel", "casual", "basic"],
         category: .apparel
     )
-    
+
     /// Complex garment project
     public static let complexGarmentProject = Project(
         id: UUID(uuidString: "PROJ1234-1234-1234-1234-123456781235")!,
@@ -491,7 +491,7 @@ public struct ProjectFixtures {
         tags: ["formal", "wedding", "complex"],
         category: .apparel
     )
-    
+
     /// Sample projects collection
     public static let sampleProjects: [Project] = [
         basicTshirtProject,
@@ -527,7 +527,7 @@ public struct AppState: Sendable, Equatable {
     public let error: AppError?
     public let deviceCapabilities: DeviceCapabilities
     public let scanProgress: ScanProgress?
-    
+
     public init(
         isFirstLaunch: Bool,
         hasCompletedOnboarding: Bool,
@@ -566,7 +566,7 @@ public enum NavigationDestination: Sendable, Equatable {
 @available(iOS 18.0, macOS 15.0, *)
 public enum TabSelection: String, Sendable, CaseIterable {
     case scan = "scan"
-    case projects = "projects" 
+    case projects = "projects"
     case settings = "settings"
 }
 
@@ -598,7 +598,7 @@ public struct ScanState: Sendable, Equatable {
     public let lastUpdate: Date
     public let scanProgress: ScanProgress?
     public let error: ScanError?
-    
+
     public init(
         phase: ScanPhase,
         arSessionState: ARSessionState,
@@ -657,7 +657,7 @@ public struct CapturedImage: Sendable, Equatable {
     public let data: Data
     public let timestamp: Date
     public let pose: CameraExtrinsics
-    
+
     public init(data: Data, timestamp: Date, pose: CameraExtrinsics) {
         self.data = data
         self.timestamp = timestamp
@@ -670,7 +670,7 @@ public struct ScanProgress: Sendable, Equatable {
     public let phase: ScanPhase
     public let progress: Double // 0.0 to 1.0
     public let message: String
-    
+
     public init(phase: ScanPhase, progress: Double, message: String) {
         self.phase = phase
         self.progress = max(0.0, min(1.0, progress))
@@ -694,7 +694,7 @@ public struct ProjectsState: Sendable, Equatable {
     public let searchText: String
     public let sortOption: ProjectSortOption
     public let filterOption: ProjectFilterOption
-    
+
     public init(
         projects: [Project],
         selectedProject: Project?,
@@ -742,7 +742,7 @@ public struct PanelEditorState: Sendable, Equatable {
     public let gridSize: Double
     public let undoStack: [UndoableAction]
     public let redoStack: [UndoableAction]
-    
+
     public init(
         panel: PanelDTO,
         flattenedPanel: FlattenedPanelDTO,
@@ -812,7 +812,7 @@ public struct SettingsState: Sendable, Equatable {
     public let enableSoundEffects: Bool
     public let debugMode: Bool
     public let privacySettings: PrivacySettings
-    
+
     public init(
         theme: ThemePreference,
         units: UnitPreference,
@@ -847,7 +847,7 @@ public struct PrivacySettings: Sendable, Equatable {
     public let allowAnalytics: Bool
     public let allowCrashReporting: Bool
     public let shareUsageData: Bool
-    
+
     public init(allowAnalytics: Bool, allowCrashReporting: Bool, shareUsageData: Bool) {
         self.allowAnalytics = allowAnalytics
         self.allowCrashReporting = allowCrashReporting
@@ -869,7 +869,7 @@ public struct DeviceCapabilities: Sendable, Equatable {
     public let screenSize: CGSize
     public let screenScale: Double
     public let supportsDynamicIsland: Bool
-    
+
     public init(
         deviceModel: String,
         hasLiDAR: Bool,
@@ -897,7 +897,7 @@ public struct DeviceCapabilities: Sendable, Equatable {
         self.screenScale = screenScale
         self.supportsDynamicIsland = supportsDynamicIsland
     }
-    
+
     public static let iphone15Pro = DeviceCapabilities(
         deviceModel: "iPhone15,2",
         hasLiDAR: true,
@@ -912,7 +912,7 @@ public struct DeviceCapabilities: Sendable, Equatable {
         screenScale: 3.0,
         supportsDynamicIsland: true
     )
-    
+
     public static let iPadPro = DeviceCapabilities(
         deviceModel: "iPad13,8",
         hasLiDAR: true,
@@ -943,7 +943,7 @@ public struct Project: Sendable, Equatable, Identifiable {
     public let exportHistory: [ExportRecord]
     public let tags: [String]
     public let category: ProjectCategory
-    
+
     public init(
         id: UUID,
         name: String,
@@ -987,7 +987,7 @@ public struct ExportRecord: Sendable, Equatable {
     public let exportedAt: Date
     public let fileSize: Int
     public let isSuccessful: Bool
-    
+
     public init(format: ExportFormat, exportedAt: Date, fileSize: Int, isSuccessful: Bool) {
         self.format = format
         self.exportedAt = exportedAt

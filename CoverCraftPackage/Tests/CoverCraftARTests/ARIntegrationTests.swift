@@ -384,7 +384,7 @@ extension ARIntegrationTests {
 struct ARIntegrationTestsSkipped {
     @Test("Skipped on non-iOS platforms")
     func testSkipped() async throws {
-        #expect(true) // Pass - tests skipped on non-iOS platforms
+        // Intentionally empty: AR integration requires iOS platform APIs.
     }
 }
 #endif

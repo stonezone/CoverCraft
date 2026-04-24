@@ -140,7 +140,6 @@ struct EndToEndWorkflowTests {
     @Test("Workflow with different segmentation resolutions")
     func workflowWithDifferentSegmentationResolutions() async throws {
         let mesh = TestDataFactory.createCubeMesh()
-        let calibration = TestDataFactory.createTestCalibration(isComplete: true)
         
         for resolution in SegmentationResolution.allCases {
             // 1. Preview segmentation
@@ -296,6 +295,7 @@ struct EndToEndWorkflowTests {
         let mesh = TestDataFactory.createCubeMesh()
         let originalVertexCount = mesh.vertices.count
         let originalTriangleCount = mesh.triangleCount
+        #expect(originalTriangleCount > 0)
         
         // Track data through workflow
         let panels = try await segmentationService.segmentMesh(mesh, targetPanelCount: 6)
@@ -325,6 +325,7 @@ struct EndToEndWorkflowTests {
     func scaleConsistencyThroughWorkflow() async throws {
         let mesh = TestDataFactory.createCubeMesh()
         let calibration = TestDataFactory.createTestCalibration(isComplete: true, realWorldDistance: 0.2) // 20cm
+        #expect(calibrationService.validateCalibration(calibration))
         
         let panels = try await segmentationService.segmentMesh(mesh, targetPanelCount: 6)
         let flattenedPanels = try await flatteningService.flattenPanels(panels, from: mesh)

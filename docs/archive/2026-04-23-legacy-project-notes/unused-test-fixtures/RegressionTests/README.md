@@ -43,17 +43,17 @@ import Testing
 @Test func preventEmptyMeshCrash() {
     // Bug #001: Previously crashed when validating empty mesh
     let emptyMesh = RegressionFixtures.bug001_EmptyMeshCrash.testData.inputData
-    
+
     if case .meshDTO(let mesh) = emptyMesh {
         // Should not crash - was fixed in v1.0.1
         let isValid = mesh.isValid
         #expect(isValid == false) // Should return false, not crash
-        
+
         // Validate performance expectation
         let startTime = Date()
         _ = mesh.isValid
         let executionTime = Date().timeIntervalSince(startTime)
-        
+
         let bug = RegressionFixtures.bug001_EmptyMeshCrash
         #expect(executionTime <= bug.testData.performanceExpectations.maxExecutionTime)
     }
@@ -65,21 +65,21 @@ import Testing
 @Test func monitorMeshProcessingPerformance() {
     let regression = RegressionFixtures.perfRegression001_MeshProcessing
     let mesh = MeshFixtures.largeMesh
-    
+
     let startTime = Date()
     let startMemory = getCurrentMemoryUsage()
-    
+
     // Execute the operation that regressed
     let result = processMesh(mesh)
-    
+
     let executionTime = Date().timeIntervalSince(startTime)
     let memoryUsed = getCurrentMemoryUsage() - startMemory
-    
+
     // Should perform better than regression version
     let regressionMetrics = regression.testData.regressionMetrics
     #expect(executionTime < regressionMetrics.executionTime)
     #expect(memoryUsed < regressionMetrics.memoryUsage)
-    
+
     // Should perform at least as well as baseline
     let baselineMetrics = regression.testData.baselineMetrics
     #expect(executionTime <= baselineMetrics.executionTime * 1.1) // 10% tolerance
@@ -91,10 +91,10 @@ import Testing
 @Test func preventDataCorruptionWithDegenerateTriangles() {
     let edgeCase = RegressionFixtures.edgeCase001_DataCorruption
     let mesh = edgeCase.inputData.mesh
-    
+
     // Previously caused data corruption in segmentation
     let panels = segmentMesh(mesh)
-    
+
     // Validate all criteria are met
     for criterion in edgeCase.validationCriteria {
         switch criterion {
@@ -116,11 +116,11 @@ import Testing
 @Test func verifyBugLifecycle() {
     // Test that a previously fixed bug remains fixed
     let bugCase = RegressionFixtures.bug002_CalibrationInfiniteLoop
-    
+
     #expect(bugCase.reproduced == true) // Bug was successfully reproduced
     #expect(bugCase.fixed == true)      // Bug has been fixed
     #expect(bugCase.severity == .high)  // Appropriate severity classification
-    
+
     // Verify fix version is after reported version
     let reportedVersion = Version(bugCase.reportedVersion)
     let fixedVersion = Version(bugCase.fixedVersion!)
@@ -133,16 +133,16 @@ import Testing
 @Test func reproduceExactBugScenario() {
     let bug = RegressionFixtures.bug005_PDFCorruption
     let scenario = bug.scenario
-    
+
     // Follow exact reproduction steps
     // 1. Create project with Unicode name
     let projectName = "T-Shirt™ Design № 1" // Contains Unicode characters
     let project = createProject(name: projectName)
-    
+
     // 2. Export to PDF
     let exportConfig = ExportFixtures.pdfPatternConfig
     let result = exportToPDF(project: project, config: exportConfig)
-    
+
     // 3. Verify PDF is valid (was corrupted before fix)
     #expect(result.isSuccess)
     if let pdfData = result.outputData {
@@ -155,30 +155,30 @@ import Testing
 ```swift
 @Test func detectMemoryLeakRegression() {
     let bug = RegressionFixtures.bug003_SegmentationMemoryLeak
-    
+
     guard case .meshDTO(let largeMesh) = bug.testData.inputData else {
         #expect(false, "Expected mesh input data")
         return
     }
-    
+
     let initialMemory = getCurrentMemoryUsage()
-    
+
     // Run segmentation multiple times (previously caused memory growth)
     for iteration in 1...10 {
         autoreleasepool {
             let panels = segmentMesh(largeMesh)
             #expect(panels.count > 0)
         }
-        
+
         // Force garbage collection
         if iteration % 3 == 0 {
             performGarbageCollection()
         }
     }
-    
+
     let finalMemory = getCurrentMemoryUsage()
     let memoryGrowth = finalMemory - initialMemory
-    
+
     // Memory growth should be minimal (previously grew 50MB per iteration)
     let maxAllowedGrowth = 20 * 1024 * 1024 // 20MB tolerance
     #expect(memoryGrowth < maxAllowedGrowth)
@@ -189,10 +189,10 @@ import Testing
 ```swift
 @Test func testFixedInSpecificVersion() {
     let bugsFixedIn105 = RegressionFixtures.testsForVersion("1.0.5")
-    
+
     for bug in bugsFixedIn105 {
         #expect(bug.fixed == true)
-        
+
         // Execute the test case to ensure fix persists
         let result = executeBugTestCase(bug)
         #expect(result.bugDidNotReoccur)
@@ -267,14 +267,14 @@ public struct RegressionTestCase {
 @Test func continuousRegressionMonitoring() {
     // Run all fixed bug tests to ensure no regressions
     let fixedBugs = RegressionFixtures.fixedBugTests
-    
+
     for bug in fixedBugs {
         let result = executeBugTestCase(bug)
-        
+
         if !result.bugDidNotReoccur {
             reportRegression(bug: bug, evidence: result.failureEvidence)
         }
-        
+
         #expect(result.bugDidNotReoccur, "Bug \(bug.bugId) has regressed!")
     }
 }
@@ -284,11 +284,11 @@ public struct RegressionTestCase {
 ```swift
 @Test func validatePerformanceBaselines() {
     let performanceTests = RegressionFixtures.allPerformanceRegressionTests
-    
+
     for perfTest in performanceTests {
         let currentMetrics = measureCurrentPerformance(perfTest.operation)
         let baselineMetrics = perfTest.testData.baselineMetrics
-        
+
         // Current performance should be at least as good as baseline
         #expect(currentMetrics.executionTime <= baselineMetrics.executionTime * 1.2)
         #expect(currentMetrics.memoryUsage <= baselineMetrics.memoryUsage * 1.1)
@@ -307,11 +307,11 @@ public struct RegressionTestCase {
         CalibrationFixtures.zeroDistance,
         CalibrationFixtures.negativeDistance
     ]
-    
+
     for input in testInputs {
         // Should handle all edge cases gracefully
         let result = processInput(input)
-        
+
         #expect(result.didNotCrash)
         #expect(result.didNotHang)
         #expect(result.hasValidOutput || result.hasExpectedError)

@@ -88,24 +88,20 @@ struct ARSessionErrorHandlingTests {
             // If successful, permissions were granted
             await service.stopScanning()
         } catch let error as ARScanningError {
-            // Should be permission-related error if denied
-            let validErrors: [ARScanningError] = [
-                .cameraPermissionDenied,
-                .sessionFailed(.cameraPermissionDenied)
-            ]
-            
             // Check if it's a permission error
             switch error {
             case .cameraPermissionDenied:
-                #expect(true) // Expected error
+                break
             case .sessionFailed(let innerError):
                 if let arError = innerError as? ARScanningError,
                    arError == .cameraPermissionDenied {
-                    #expect(true) // Expected wrapped error
+                    break
+                } else {
+                    #expect(!String(describing: error).isEmpty)
                 }
             default:
                 // Other errors may be acceptable in test environment
-                #expect(error != nil)
+                #expect(!String(describing: error).isEmpty)
             }
         }
     }
@@ -131,13 +127,13 @@ struct ARSessionErrorHandlingTests {
             // Verify error is wrapped appropriately
             switch error {
             case .sessionFailed(_):
-                #expect(true) // Expected error type
+                break
             case .deviceNotSupported:
-                #expect(true) // Also acceptable
+                break
             case .cameraPermissionDenied:
-                #expect(true) // Also acceptable
+                break
             default:
-                #expect(error != nil) // At least some error
+                #expect(!String(describing: error).isEmpty) // At least some error
             }
         }
     }
@@ -203,7 +199,7 @@ struct ARSessionErrorHandlingTests {
 struct ARSessionErrorHandlingTestsSkipped {
     @Test("Skipped on non-iOS platforms")
     func testSkipped() async throws {
-        #expect(true) // Pass - tests skipped on non-iOS platforms
+        // Intentionally empty: AR session error handling requires iOS platform APIs.
     }
 }
 #endif

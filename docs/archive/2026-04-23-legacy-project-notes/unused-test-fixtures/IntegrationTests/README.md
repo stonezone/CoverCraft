@@ -48,14 +48,14 @@ import Testing
 
 @Test func completeWorkflowExecution() async {
     let workflow = IntegrationFixtures.tshirtWorkflow
-    
+
     // Execute complete workflow
     let result = await executeWorkflow(workflow)
-    
+
     #expect(result.isSuccess)
     #expect(result.completedSteps.count == workflow.steps.count)
     #expect(result.executionTime <= workflow.expectedDuration)
-    
+
     // Validate output data
     if case .exportData(let exportData) = result.finalOutput {
         #expect(exportData.count > 0)
@@ -69,16 +69,16 @@ import Testing
 @Test func dataFlowIntegration() async {
     let integration = IntegrationFixtures.arToSegmentationIntegration
     let mesh = MeshFixtures.tshirtMesh
-    
+
     // Test data flow from AR to Segmentation
     let segmentationResult = await processDataFlow(integration.dataFlow, input: mesh)
-    
+
     #expect(segmentationResult.isSuccess)
-    
+
     if case .panelData(let panels) = segmentationResult.output {
         #expect(panels.count > 0)
         #expect(panels.allSatisfy { $0.isValid })
-        
+
         // Validate data flow rules
         for rule in integration.dataFlow.validationRules {
             #expect(validateRule(rule, input: mesh, output: panels))
@@ -91,21 +91,21 @@ import Testing
 ```swift
 @Test func errorRecoveryHandling() async {
     let recovery = IntegrationFixtures.trackingLostRecovery
-    
+
     // Simulate error condition
     let initialState = recovery.initialState
     let errorCondition = recovery.errorCondition
-    
+
     // Execute recovery steps
     let recoveryResult = await executeErrorRecovery(
         from: initialState,
         error: errorCondition,
         steps: recovery.expectedRecoverySteps
     )
-    
+
     #expect(recoveryResult.wasSuccessful)
     #expect(recoveryResult.executionTime <= recovery.recoveryTimeoutSeconds)
-    
+
     // If recovery failed, check fallback action
     if !recoveryResult.wasSuccessful {
         let fallbackResult = await executeFallbackAction(recovery.fallbackAction)
@@ -118,20 +118,20 @@ import Testing
 ```swift
 @Test func performanceBenchmarkValidation() async {
     let benchmark = IntegrationFixtures.largeMeshBenchmark
-    
+
     let startTime = Date()
     let startMemory = getCurrentMemoryUsage()
-    
+
     // Execute benchmark test case
     let result = await executeBenchmark(benchmark.testCase)
-    
+
     let executionTime = Date().timeIntervalSince(startTime)
     let memoryUsage = getCurrentMemoryUsage() - startMemory
-    
+
     // Validate performance metrics
     #expect(executionTime <= benchmark.expectedMetrics.maxProcessingTime)
     #expect(memoryUsage <= benchmark.expectedMetrics.maxMemoryUsage)
-    
+
     // Check device requirements
     let currentDevice = getCurrentDeviceCapabilities()
     #expect(currentDevice.meets(benchmark.deviceRequirements))
@@ -142,14 +142,14 @@ import Testing
 ```swift
 @Test func deviceCompatibilityValidation() async {
     let compatibility = IntegrationFixtures.iPhoneCompatibility
-    
+
     for deviceProfile in compatibility.targetDevices {
         // Simulate device capabilities
         configureForDevice(deviceProfile.capabilities)
-        
+
         for scenario in compatibility.testScenarios {
             let result = await executeWorkflow(scenario)
-            
+
             // Check expected behaviors
             for behavior in compatibility.expectedBehaviors {
                 #expect(validateBehavior(behavior, result: result, device: deviceProfile))
@@ -163,29 +163,29 @@ import Testing
 ```swift
 @Test func systemStressTesting() async {
     let complexWorkflow = IntegrationFixtures.complexGarmentWorkflow
-    
+
     // Execute workflow multiple times concurrently
     let concurrentTasks = (0..<5).map { _ in
         Task {
             await executeWorkflow(complexWorkflow)
         }
     }
-    
+
     let results = await withTaskGroup(of: WorkflowResult.self) { group in
         concurrentTasks.forEach { task in
             group.addTask { await task.value }
         }
-        
+
         var allResults: [WorkflowResult] = []
         for await result in group {
             allResults.append(result)
         }
         return allResults
     }
-    
+
     // All concurrent executions should succeed
     #expect(results.allSatisfy { $0.isSuccess })
-    
+
     // Performance should not degrade significantly
     let averageTime = results.map { $0.executionTime }.reduce(0, +) / Double(results.count)
     #expect(averageTime <= complexWorkflow.expectedDuration * 1.5)
@@ -231,13 +231,13 @@ Use device-specific fixtures:
 @Test func sequentialWorkflowExecution() async {
     let workflow = IntegrationFixtures.tshirtWorkflow
     var currentState: WorkflowState = .initializing
-    
+
     for step in workflow.steps {
         let stepResult = await executeWorkflowStep(step, currentState: currentState)
         #expect(stepResult.isSuccess)
         currentState = stepResult.newState
     }
-    
+
     #expect(currentState == .completed)
 }
 ```
@@ -246,7 +246,7 @@ Use device-specific fixtures:
 ```swift
 @Test func parallelProcessingCapability() async {
     let panels = PanelFixtures.tshirtPanelSet
-    
+
     // Process panels in parallel
     let results = await withTaskGroup(of: FlattenedPanelDTO.self) { group in
         for panel in panels {
@@ -254,14 +254,14 @@ Use device-specific fixtures:
                 await flattenPanel(panel)
             }
         }
-        
+
         var flattenedPanels: [FlattenedPanelDTO] = []
         for await result in group {
             flattenedPanels.append(result)
         }
         return flattenedPanels
     }
-    
+
     #expect(results.count == panels.count)
     #expect(results.allSatisfy { $0.isValid })
 }
@@ -271,18 +271,18 @@ Use device-specific fixtures:
 ```swift
 @Test func workflowStatePersistence() async {
     let workflow = IntegrationFixtures.complexGarmentWorkflow
-    
+
     // Execute partial workflow
     let partialResult = await executeWorkflowUntilStep(workflow, stepIndex: 3)
-    
+
     // Save state
     let savedState = partialResult.currentState
     await saveWorkflowState(savedState)
-    
+
     // Restore and continue
     let restoredState = await loadWorkflowState()
     let finalResult = await continueWorkflowFromState(workflow, state: restoredState)
-    
+
     #expect(finalResult.isSuccess)
 }
 ```
@@ -293,15 +293,15 @@ Use device-specific fixtures:
 ```swift
 @Test func memoryUsageValidation() async {
     let benchmark = IntegrationFixtures.largeMeshBenchmark
-    
+
     let initialMemory = getCurrentMemoryUsage()
-    
+
     // Execute memory-intensive operation
     let result = await executeBenchmark(benchmark.testCase)
-    
+
     let peakMemory = getPeakMemoryUsage()
     let finalMemory = getCurrentMemoryUsage()
-    
+
     // Memory should return to near-initial levels (allowing for some overhead)
     #expect(finalMemory - initialMemory < 50 * 1024 * 1024) // 50MB tolerance
     #expect(peakMemory <= benchmark.expectedMetrics.maxMemoryUsage)
@@ -312,14 +312,14 @@ Use device-specific fixtures:
 ```swift
 @Test func cpuUsageValidation() async {
     let benchmark = IntegrationFixtures.realTimeARBenchmark
-    
+
     let monitor = CPUUsageMonitor()
     monitor.start()
-    
+
     let result = await executeBenchmark(benchmark.testCase)
-    
+
     let avgCPUUsage = monitor.stop()
-    
+
     #expect(avgCPUUsage <= benchmark.expectedMetrics.maxCPUUsage)
     #expect(result.frameRate >= benchmark.expectedMetrics.targetFrameRate)
 }
@@ -330,13 +330,13 @@ Use device-specific fixtures:
 @Test func throughputMeasurement() async {
     let operations = 100
     let startTime = Date()
-    
+
     // Process multiple operations
     let results = await processOperationsBatch(count: operations)
-    
+
     let executionTime = Date().timeIntervalSince(startTime)
     let throughput = Double(operations) / executionTime
-    
+
     #expect(throughput >= 10.0) // Minimum 10 operations per second
     #expect(results.count == operations)
 }
