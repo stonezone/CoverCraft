@@ -13,8 +13,19 @@ struct CoverCraftApp: App {
     init() {
         Self.resetUITestExportsIfRequested()
 
+        #if DEBUG
+        DebugFileLogging.prepareSession()
+        #endif
+
         LoggingSystem.bootstrap { label in
-            StreamLogHandler.standardOutput(label: label)
+            #if DEBUG
+            return MultiplexLogHandler([
+                StreamLogHandler.standardOutput(label: label),
+                DebugFileLogHandler(label: label)
+            ])
+            #else
+            return StreamLogHandler.standardOutput(label: label)
+            #endif
         }
 
         let container = DefaultDependencyContainer.shared
