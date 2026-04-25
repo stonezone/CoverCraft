@@ -476,17 +476,20 @@ public final class ARScanViewController: UIViewController {
 
         logger.info("Depth filter: \(filteredMesh.vertices.count) vertices, \(filteredMesh.triangleCount) triangles (max depth: \(maxDepth)m); raw mesh: \(rawMesh.vertices.count) vertices, \(rawMesh.triangleCount) triangles")
 
-        if filteredMesh.isValid {
-            return filteredMesh
-        }
-
-        if rawMesh.isValid {
+        let finalMesh = FinalMeshSelection.preferredFinalMesh(filtered: filteredMesh, raw: rawMesh)
+        if finalMesh.id == rawMesh.id && !filteredMesh.isValid {
             logger.warning("Depth filter produced an invalid final mesh; using unfiltered captured mesh instead")
-            return rawMesh
         }
 
-        logger.error("Final mesh is invalid after both filtered and unfiltered extraction")
-        return filteredMesh
+        if finalMesh.id == rawMesh.id && filteredMesh.isValid {
+            logger.info("Using unfiltered captured mesh for review-first object isolation")
+        }
+
+        if !finalMesh.isValid {
+            logger.error("Final mesh is invalid after both filtered and unfiltered extraction")
+        }
+
+        return finalMesh
     }
 }
 

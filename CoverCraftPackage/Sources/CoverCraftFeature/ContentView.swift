@@ -191,6 +191,7 @@ public struct ContentView: View {
                 VStack(spacing: 18) {
                     inputCard
                     if appState.inputMode == .scan {
+                        meshReviewSection
                         meshCleanupCard
                         calibrationCard
                     }
@@ -355,7 +356,7 @@ public struct ContentView: View {
             .tint(.blue)
             .accessibilityIdentifier("covercraft.startScanButton")
 
-            Text("Capture the object from multiple angles, then clean the mesh and calibrate it before generation.")
+            Text("Capture the object from multiple angles, then review, isolate, and calibrate the mesh before generation.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -447,14 +448,14 @@ public struct ContentView: View {
     }
 
     private var meshCleanupCard: some View {
-        CoverCraftCard(tone: appState.hasProcessedMesh ? .success : .neutral) {
+        CoverCraftCard(tone: appState.hasProcessedMesh ? .success : .warning) {
             CoverCraftSectionHeading(
                 step: "Step 1b",
-                title: "Clean Up Mesh",
-                subtitle: "Optional but useful when the scan includes floor surfaces, fragments, or open holes.",
-                statusTitle: appState.hasProcessedMesh ? "Processed" : "Optional",
+                title: "Isolate Target Mesh",
+                subtitle: "Recommended for LiDAR scans because raw scene reconstruction often includes floor, wall, and background geometry.",
+                statusTitle: appState.hasProcessedMesh ? "Processed" : "Recommended",
                 statusImage: appState.hasProcessedMesh ? "checkmark.circle.fill" : "wand.and.stars",
-                tone: appState.hasProcessedMesh ? .success : .neutral
+                tone: appState.hasProcessedMesh ? .success : .warning
             )
 
             if let mesh = appState.currentMesh {
@@ -467,9 +468,9 @@ public struct ContentView: View {
                 } label: {
                     WorkflowNavigationRow(
                         title: "Open cleanup tools",
-                        subtitle: "Fill holes, crop unwanted surfaces, and isolate the main object before calibration.",
+                        subtitle: "Crop unwanted surfaces, isolate the main object, and review before calibration.",
                         systemImage: "wand.and.stars",
-                        tone: .accent,
+                        tone: .warning,
                         trailingText: appState.hasProcessedMesh ? "Updated" : "Review"
                     )
                 }
@@ -488,6 +489,34 @@ public struct ContentView: View {
                     systemImage: "camera.metering.unknown",
                     tone: .warning
                 )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var meshReviewSection: some View {
+        if let effectiveMesh = appState.effectiveMesh {
+            MeshPreviewView(
+                mesh: effectiveMesh,
+                title: appState.hasProcessedMesh ? "Review Isolated Mesh" : "Review Captured Mesh",
+                subtitle: appState.hasProcessedMesh
+                    ? "This processed mesh is the active source for calibration and pattern generation."
+                    : "This is the raw capture. Use cleanup to remove floor, wall, and background geometry before calibration."
+            )
+        } else if appState.currentMesh != nil {
+            CoverCraftCard(tone: .warning) {
+                CoverCraftSectionHeading(
+                    step: "Review",
+                    title: "Captured Mesh Is Invalid",
+                    subtitle: "The scan produced geometry that cannot be safely reviewed or used for pattern generation.",
+                    statusTitle: "Blocked",
+                    statusImage: "exclamationmark.triangle.fill",
+                    tone: .warning
+                )
+
+                Text("Rescan the object before continuing. Invalid meshes are now blocked instead of silently reaching calibration or generation.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
     }

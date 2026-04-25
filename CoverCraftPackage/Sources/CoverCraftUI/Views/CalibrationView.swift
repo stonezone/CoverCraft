@@ -118,10 +118,10 @@ public struct CalibrationView: View {
                         tone: calibrationData.isComplete ? .success : .accent
                     )
 
-                    Text("Calibrate the scan with one measured reference before generating the pattern.")
+                    Text("Calibrate the scan with one visible reference before generating the pattern.")
                         .font(.title3.weight(.semibold))
 
-                    Text("Choose the most trustworthy dimension, then enter its real-world distance in meters.")
+                    Text("Use the mesh preview and extents below to pick the dimension you can measure most accurately.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -148,7 +148,7 @@ public struct CalibrationView: View {
             CoverCraftSectionHeading(
                 step: "Mesh",
                 title: "Current Mesh",
-                subtitle: "Use the extents below to pick a reference that matches a real-world measurement.",
+                subtitle: "These are bounding-box extents. They help you choose a reference, but they are not a substitute for a visual point-to-point pick.",
                 tone: .neutral
             )
 
@@ -176,6 +176,13 @@ public struct CalibrationView: View {
 
                 if let size {
                     CoverCraftMetricTile(
+                        title: "Max length",
+                        value: String(format: "%.3f", max(size.x, max(size.y, size.z))),
+                        subtitle: "Longest extent",
+                        systemImage: "ruler",
+                        tone: .accent
+                    )
+                    CoverCraftMetricTile(
                         title: "Width",
                         value: String(format: "%.3f", size.x),
                         subtitle: "Mesh units",
@@ -198,6 +205,10 @@ public struct CalibrationView: View {
                     )
                 }
             }
+
+            Text("Near-term workflow: use the visible longest extent as a guide. Next calibration phase should replace these abstract axes with tap-to-tap points on the mesh preview.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

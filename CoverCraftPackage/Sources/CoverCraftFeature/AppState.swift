@@ -32,12 +32,20 @@ public final class ScanState {
 
     /// The mesh to use for pattern generation (processed if available, otherwise raw)
     public var effectiveMesh: MeshDTO? {
-        processedMesh ?? currentMesh
+        if let processedMesh, processedMesh.isValid {
+            return processedMesh
+        }
+
+        guard let currentMesh, currentMesh.isValid else {
+            return nil
+        }
+
+        return currentMesh
     }
 
     /// Whether mesh processing has been applied
     public var hasProcessedMesh: Bool {
-        processedMesh != nil
+        processedMesh?.isValid == true
     }
 
     /// Whether calibration is complete for the current scan

@@ -56,15 +56,15 @@ public struct MeshProcessingView: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 10) {
                     CoverCraftStatusChip(
-                        hasAnyOptionEnabled ? "Cleanup configured" : "Optional cleanup",
+                        hasAnyOptionEnabled ? "Isolation configured" : "Review needed",
                         systemImage: hasAnyOptionEnabled ? "slider.horizontal.3" : "wand.and.stars",
-                        tone: hasAnyOptionEnabled ? .accent : .neutral
+                        tone: hasAnyOptionEnabled ? .accent : .warning
                     )
 
-                    Text("Fix scan noise before calibration or segmentation.")
+                    Text("Isolate the intended object before calibration or segmentation.")
                         .font(.title3.weight(.semibold))
 
-                    Text("Use this screen to close small holes, crop floors or ceilings, and discard floating fragments.")
+                    Text("Raw LiDAR reconstruction often includes floor, wall, table, or nearby objects. Use this step to remove geometry that should not become fabric.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -234,8 +234,8 @@ public struct MeshProcessingView: View {
         CoverCraftCard(tone: hasAnyOptionEnabled ? .accent : .neutral) {
             CoverCraftSectionHeading(
                 step: "Apply",
-                title: "Run Cleanup",
-                subtitle: "Apply the selected mesh fixes, then use the processed result for the rest of the workflow.",
+                title: "Apply Isolation",
+                subtitle: "Apply the selected mesh fixes, then use the processed object mesh for review, calibration, and generation.",
                 tone: hasAnyOptionEnabled ? .accent : .neutral
             )
 
