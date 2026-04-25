@@ -364,17 +364,26 @@ public final class ARScanViewController: UIViewController {
             cameraPosition = SIMD3<Float>(0, 0, 0)
         }
 
-        var allVertices: [SIMD3<Float>] = []
-        var allIndices: [Int] = []
-        var vertexOffset = 0
+        var filteredVertices: [SIMD3<Float>] = []
+        var filteredIndices: [Int] = []
+        var rawVertices: [SIMD3<Float>] = []
+        var rawIndices: [Int] = []
+        var filteredVertexOffset = 0
+        var rawVertexOffset = 0
         let maxDepthSquared = maxDepth * maxDepth  // Avoid sqrt in distance checks
 
-        for anchor in collectedMeshAnchors.values {
+        for anchorID in anchorInsertionOrder {
+            guard let anchor = collectedMeshAnchors[anchorID] else {
+                continue
+            }
+
             let geometry = anchor.geometry
 
             // Map from original vertex index to filtered vertex index
-            var vertexIndexMap: [Int: Int] = [:]
-            var anchorVertices: [SIMD3<Float>] = []
+            var filteredVertexIndexMap: [Int: Int] = [:]
+            var rawVertexIndexMap: [Int: Int] = [:]
+            var anchorFilteredVertices: [SIMD3<Float>] = []
+            var anchorRawVertices: [SIMD3<Float>] = []
 
             // Extract vertices with proper buffer access and depth filtering
             for i in 0..<geometry.vertices.count {
@@ -387,14 +396,17 @@ public final class ARScanViewController: UIViewController {
                 let worldPos4 = anchor.transform * SIMD4<Float>(localVertex, 1.0)
                 let worldPos = SIMD3<Float>(worldPos4.x, worldPos4.y, worldPos4.z)
 
+                rawVertexIndexMap[i] = anchorRawVertices.count
+                anchorRawVertices.append(worldPos)
+
                 // Check distance from camera (squared to avoid sqrt)
                 let delta = worldPos - cameraPosition
                 let distanceSquared = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z
 
                 // Only include vertices within max depth
                 if distanceSquared <= maxDepthSquared {
-                    vertexIndexMap[i] = anchorVertices.count
-                    anchorVertices.append(worldPos)
+                    filteredVertexIndexMap[i] = anchorFilteredVertices.count
+                    anchorFilteredVertices.append(worldPos)
                 }
             }
 
@@ -410,12 +422,20 @@ public final class ARScanViewController: UIViewController {
                     let i2 = Int(pointer[faceIdx * 3 + 2])
 
                     // Only include triangle if all three vertices passed depth filter
-                    if let newI0 = vertexIndexMap[i0],
-                       let newI1 = vertexIndexMap[i1],
-                       let newI2 = vertexIndexMap[i2] {
-                        allIndices.append(newI0 + vertexOffset)
-                        allIndices.append(newI1 + vertexOffset)
-                        allIndices.append(newI2 + vertexOffset)
+                    if let newI0 = filteredVertexIndexMap[i0],
+                       let newI1 = filteredVertexIndexMap[i1],
+                       let newI2 = filteredVertexIndexMap[i2] {
+                        filteredIndices.append(newI0 + filteredVertexOffset)
+                        filteredIndices.append(newI1 + filteredVertexOffset)
+                        filteredIndices.append(newI2 + filteredVertexOffset)
+                    }
+
+                    if let newI0 = rawVertexIndexMap[i0],
+                       let newI1 = rawVertexIndexMap[i1],
+                       let newI2 = rawVertexIndexMap[i2] {
+                        rawIndices.append(newI0 + rawVertexOffset)
+                        rawIndices.append(newI1 + rawVertexOffset)
+                        rawIndices.append(newI2 + rawVertexOffset)
                     }
                 }
             } else {
@@ -426,23 +446,47 @@ public final class ARScanViewController: UIViewController {
                     let i2 = Int(pointer[faceIdx * 3 + 2])
 
                     // Only include triangle if all three vertices passed depth filter
-                    if let newI0 = vertexIndexMap[i0],
-                       let newI1 = vertexIndexMap[i1],
-                       let newI2 = vertexIndexMap[i2] {
-                        allIndices.append(newI0 + vertexOffset)
-                        allIndices.append(newI1 + vertexOffset)
-                        allIndices.append(newI2 + vertexOffset)
+                    if let newI0 = filteredVertexIndexMap[i0],
+                       let newI1 = filteredVertexIndexMap[i1],
+                       let newI2 = filteredVertexIndexMap[i2] {
+                        filteredIndices.append(newI0 + filteredVertexOffset)
+                        filteredIndices.append(newI1 + filteredVertexOffset)
+                        filteredIndices.append(newI2 + filteredVertexOffset)
+                    }
+
+                    if let newI0 = rawVertexIndexMap[i0],
+                       let newI1 = rawVertexIndexMap[i1],
+                       let newI2 = rawVertexIndexMap[i2] {
+                        rawIndices.append(newI0 + rawVertexOffset)
+                        rawIndices.append(newI1 + rawVertexOffset)
+                        rawIndices.append(newI2 + rawVertexOffset)
                     }
                 }
             }
 
             // Add filtered vertices to final array
-            allVertices.append(contentsOf: anchorVertices)
-            vertexOffset += anchorVertices.count
+            filteredVertices.append(contentsOf: anchorFilteredVertices)
+            filteredVertexOffset += anchorFilteredVertices.count
+            rawVertices.append(contentsOf: anchorRawVertices)
+            rawVertexOffset += anchorRawVertices.count
         }
 
-        logger.info("Depth filter: \(allVertices.count) vertices, \(allIndices.count / 3) triangles (max depth: \(maxDepth)m)")
-        return MeshDTO(vertices: allVertices, triangleIndices: allIndices)
+        let filteredMesh = MeshDTO(vertices: filteredVertices, triangleIndices: filteredIndices)
+        let rawMesh = MeshDTO(vertices: rawVertices, triangleIndices: rawIndices)
+
+        logger.info("Depth filter: \(filteredMesh.vertices.count) vertices, \(filteredMesh.triangleCount) triangles (max depth: \(maxDepth)m); raw mesh: \(rawMesh.vertices.count) vertices, \(rawMesh.triangleCount) triangles")
+
+        if filteredMesh.isValid {
+            return filteredMesh
+        }
+
+        if rawMesh.isValid {
+            logger.warning("Depth filter produced an invalid final mesh; using unfiltered captured mesh instead")
+            return rawMesh
+        }
+
+        logger.error("Final mesh is invalid after both filtered and unfiltered extraction")
+        return filteredMesh
     }
 }
 
