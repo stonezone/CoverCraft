@@ -7,6 +7,41 @@ import CoverCraftCore
 import UIKit
 #endif
 
+enum CalibrationDistanceUnit: String, CaseIterable, Identifiable {
+    case millimeters = "mm"
+    case centimeters = "cm"
+    case meters = "m"
+    case inches = "in"
+
+    var id: String { rawValue }
+
+    var metersPerUnit: Double {
+        switch self {
+        case .millimeters: return 0.001
+        case .centimeters: return 0.01
+        case .meters: return 1
+        case .inches: return 0.0254
+        }
+    }
+
+    var exampleText: String {
+        switch self {
+        case .millimeters: return "Example: enter `500` for a 500 mm reference."
+        case .centimeters: return "Example: enter `50` for a 50 cm reference."
+        case .meters: return "Example: enter `0.5` for a 0.5 m reference."
+        case .inches: return "Example: enter `20` for a 20 inch reference."
+        }
+    }
+
+    func meters(from value: Double) -> Double {
+        value * metersPerUnit
+    }
+
+    func displayValue(fromMeters meters: Double) -> Double {
+        meters / metersPerUnit
+    }
+}
+
 enum CalibrationMethod: String, CaseIterable, Identifiable {
     case pointToPoint = "Tap-to-Tap Points"
     case diagonal = "Bounding Box Diagonal"
@@ -58,6 +93,7 @@ public struct CalibrationView: View {
     @Binding var calibrationData: CalibrationDTO
 
     @State private var realWorldDistanceText = ""
+    @State private var selectedDistanceUnit: CalibrationDistanceUnit = .millimeters
     @State private var selectedMethod: CalibrationMethod = .pointToPoint
     @State private var computedMeshDistance: Float = 0.0
     @State private var selectedReferencePoints: [SIMD3<Float>] = []
@@ -109,7 +145,9 @@ public struct CalibrationView: View {
         #endif
         .onAppear {
             if calibrationData.isRealWorldDistanceSet && calibrationData.realWorldDistance > 0 {
-                realWorldDistanceText = String(format: "%.2f", calibrationData.realWorldDistance)
+                realWorldDistanceText = formattedDistance(
+                    selectedDistanceUnit.displayValue(fromMeters: calibrationData.realWorldDistance)
+                )
             }
             if let firstPoint = calibrationData.firstPoint,
                let secondPoint = calibrationData.secondPoint {
@@ -120,6 +158,10 @@ public struct CalibrationView: View {
         }
         .onChange(of: selectedMethod) { _, _ in
             updateComputedDistance()
+        }
+        .onChange(of: selectedDistanceUnit) { oldUnit, newUnit in
+            guard let meters = parsedRealWorldDistance(in: oldUnit) else { return }
+            realWorldDistanceText = formattedDistance(newUnit.displayValue(fromMeters: meters))
         }
     }
 
@@ -315,9 +357,16 @@ public struct CalibrationView: View {
             CoverCraftSectionHeading(
                 step: "Step 2",
                 title: "Enter Real Distance",
-                subtitle: "Use meters for the measured distance of the selected reference line.",
+                subtitle: "Enter the physical measurement for the selected reference line.",
                 tone: .accent
             )
+
+            Picker("Distance Unit", selection: $selectedDistanceUnit) {
+                ForEach(CalibrationDistanceUnit.allCases) { unit in
+                    Text(unit.rawValue).tag(unit)
+                }
+            }
+            .pickerStyle(.segmented)
 
             HStack(spacing: 12) {
                 Image(systemName: "ruler.fill")
@@ -330,19 +379,20 @@ public struct CalibrationView: View {
                     .keyboardType(.decimalPad)
                     #endif
 
-                Text("meters")
+                Text(selectedDistanceUnit.rawValue)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+                    .frame(width: 34, alignment: .trailing)
             }
 
-            Text("Example: enter `1.25` for a 1.25 meter reference.")
+            Text(selectedDistanceUnit.exampleText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             if !realWorldDistanceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                parsedRealWorldDistance == nil {
                 CoverCraftStatusChip(
-                    "Enter a positive distance in meters",
+                    "Enter a positive distance in \(selectedDistanceUnit.rawValue)",
                     systemImage: "exclamationmark.triangle.fill",
                     tone: .warning
                 )
@@ -386,8 +436,8 @@ public struct CalibrationView: View {
                 )
                 CoverCraftMetricTile(
                     title: "Real distance",
-                    value: String(format: "%.3f m", calibrationData.realWorldDistance),
-                    subtitle: "Measured reference",
+                    value: "\(formattedDistance(selectedDistanceUnit.displayValue(fromMeters: calibrationData.realWorldDistance))) \(selectedDistanceUnit.rawValue)",
+                    subtitle: "Stored as \(String(format: "%.3f m", calibrationData.realWorldDistance))",
                     systemImage: "ruler",
                     tone: .success
                 )
@@ -447,12 +497,24 @@ public struct CalibrationView: View {
     }
 
     private var parsedRealWorldDistance: Double? {
+        parsedRealWorldDistance(in: selectedDistanceUnit)
+    }
+
+    private func parsedRealWorldDistance(in unit: CalibrationDistanceUnit) -> Double? {
         let trimmedValue = realWorldDistanceText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let distance = Double(trimmedValue), distance > 0 else {
             return nil
         }
 
-        return distance
+        return unit.meters(from: distance)
+    }
+
+    private func formattedDistance(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+
+        return String(format: "%.2f", value)
     }
 
     private func applyCalibration() {

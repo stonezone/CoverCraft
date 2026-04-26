@@ -11,13 +11,10 @@ final class CoverCraftUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.navigationBars["CoverCraft"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["covercraft.versionBadge"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["covercraft.inputModePicker"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["covercraft.startScanButton"].exists)
-
-        let generateButton = app.buttons["covercraft.generatePatternButton"]
-        scrollToElement(generateButton, in: app)
-        XCTAssertTrue(generateButton.exists)
-        XCTAssertFalse(generateButton.isEnabled)
+        XCTAssertTrue(app.buttons["covercraft.bottomStartScanButton"].exists)
     }
 
     @MainActor
@@ -26,10 +23,7 @@ final class CoverCraftUITests: XCTestCase {
         app.launchArguments += ["UITEST_MANUAL_MODE"]
         app.launch()
 
-        let generateButton = app.buttons["covercraft.generatePatternButton"]
-        scrollToElement(generateButton, in: app)
-        XCTAssertTrue(generateButton.exists)
-        XCTAssertFalse(generateButton.isEnabled)
+        XCTAssertFalse(app.buttons["covercraft.generatePatternButton"].exists)
         XCTAssertTrue(app.staticTexts["covercraft.manualCalibrationNote"].exists)
     }
 

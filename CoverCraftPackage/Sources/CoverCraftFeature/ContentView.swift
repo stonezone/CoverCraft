@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Logging
 import CoverCraftDTO
@@ -30,6 +31,7 @@ public struct ContentView: View {
     @State private var errorMessage: String?
     @State private var showErrorAlert = false
     @State private var showFittedModeWarning = false
+    @State private var showAdvancedPatternSettings = false
 
     public init() {}
 
@@ -144,6 +146,125 @@ public struct ContentView: View {
         return "No export"
     }
 
+    private var appVersionLabel: String {
+        let components = appVersionComponents
+        return "v\(components.version) • Build \(components.build)"
+    }
+
+    private var appVersionAccessibilityLabel: String {
+        let components = appVersionComponents
+        return "App version \(components.version), build \(components.build)"
+    }
+
+    private var appVersionComponents: (version: String, build: String) {
+        (
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0",
+            build: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        )
+    }
+
+    private var inputStepIsComplete: Bool {
+        switch appState.inputMode {
+        case .scan:
+            return appState.currentMesh?.isValid == true
+        case .manual:
+            return hasConfirmedManualDimensions
+        }
+    }
+
+    private var workflowProgressSteps: [WorkflowProgressStep] {
+        var steps: [WorkflowProgressStep] = [
+            WorkflowProgressStep(
+                title: "Input",
+                subtitle: appState.inputMode == .scan ? "Scan" : "Measure",
+                state: inputStepIsComplete ? .complete : .active
+            )
+        ]
+
+        if appState.inputMode == .scan {
+            steps.append(
+                WorkflowProgressStep(
+                    title: "Clean",
+                    subtitle: appState.hasProcessedMesh ? "Isolated" : "Crop",
+                    state: appState.hasProcessedMesh ? .complete : (appState.currentMesh == nil ? .locked : .active)
+                )
+            )
+            steps.append(
+                WorkflowProgressStep(
+                    title: "Scale",
+                    subtitle: appState.calibrationData.isComplete ? "Set" : "Tap points",
+                    state: appState.calibrationData.isComplete ? .complete : (appState.effectiveMesh == nil ? .locked : .active)
+                )
+            )
+        }
+
+        steps.append(
+            WorkflowProgressStep(
+                title: "Pattern",
+                subtitle: hasFreshGeneratedPattern ? "Ready" : "Generate",
+                state: hasFreshGeneratedPattern ? .complete : (canGenerateCurrentWorkflow ? .active : .locked)
+            )
+        )
+
+        return steps
+    }
+
+    private var nextActionTitle: String {
+        if hasFreshGeneratedPattern {
+            return "Export the pattern"
+        }
+
+        if canGenerateCurrentWorkflow {
+            return "Generate the sewing pattern"
+        }
+
+        switch appState.inputMode {
+        case .manual:
+            return hasConfirmedManualDimensions ? "Review pattern settings" : "Enter width, depth, and height"
+        case .scan:
+            if appState.currentMesh == nil {
+                return "Scan the object"
+            }
+            if !appState.hasProcessedMesh {
+                return "Crop the scan to the target object"
+            }
+            if !appState.calibrationData.isComplete {
+                return "Set real-world scale"
+            }
+            return "Review pattern settings"
+        }
+    }
+
+    private var nextActionSubtitle: String {
+        if hasFreshGeneratedPattern {
+            return "The generated panels match the current scan and settings. Export is the next useful action."
+        }
+
+        if canGenerateCurrentWorkflow {
+            return "The required inputs are ready. Generate, then review the export panels."
+        }
+
+        switch appState.inputMode {
+        case .manual:
+            return "Manual mode skips LiDAR and scale. The Generate button stays disabled until all three dimensions are valid."
+        case .scan:
+            if appState.currentMesh == nil {
+                return "Capture from several angles. After finishing the scan, this screen should show non-zero vertices and triangles."
+            }
+            if !appState.hasProcessedMesh {
+                return "LiDAR usually captures background surfaces. Use cleanup before scale so the cover is built from the intended object."
+            }
+            if !appState.calibrationData.isComplete {
+                return "Tap two visible points on the mesh and enter the matching real-world distance."
+            }
+            return "The scan is scaled. Keep slipcover for reliability or switch to fitted only when you need segmented panels."
+        }
+    }
+
+    private var patternConfigurationStepLabel: String {
+        appState.inputMode == .scan ? "Step 4" : "Step 2"
+    }
+
     private var currentWorkflowConfiguration: WorkflowConfiguration {
         WorkflowConfiguration(
             inputMode: appState.inputMode,
@@ -189,6 +310,7 @@ public struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
+                    workflowHeroCard
                     inputCard
                     if appState.inputMode == .scan {
                         meshReviewSection
@@ -196,7 +318,6 @@ public struct ContentView: View {
                         calibrationCard
                     }
                     patternConfigurationCard
-                    workflowHeroCard
                     helpCard
                 }
                 .padding(.horizontal, 16)
@@ -242,6 +363,9 @@ public struct ContentView: View {
                 }
                 invalidateGeneratedOutput()
             }
+            .onChange(of: appState.currentMesh?.id) { oldID, newID in
+                resetScanDependentStateIfNeeded(oldID: oldID, newID: newID)
+            }
             .task {
                 guard !servicesResolved else { return }
                 arService = container.resolve(ARScanningService.self)
@@ -255,34 +379,38 @@ public struct ContentView: View {
 
     private var workflowHeroCard: some View {
         CoverCraftCard(tone: workflowTone) {
-            HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    CoverCraftStatusChip(
-                        workflowStatusTitle,
-                        systemImage: workflowStatusImage,
-                        tone: workflowTone
-                    )
-
-                    Text("Generate cleaner sewing patterns from a LiDAR scan or exact dimensions.")
-                        .font(.title2.weight(.semibold))
-
-                    Text("The workflow is now organized around the next required action instead of a long settings list.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+            HStack(alignment: .top, spacing: 12) {
+                CoverCraftStatusChip(
+                    workflowStatusTitle,
+                    systemImage: workflowStatusImage,
+                    tone: workflowTone
+                )
 
                 Spacer(minLength: 8)
 
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(workflowTone == .success ? Color.green.opacity(0.12) : Color.blue.opacity(0.12))
-                        .frame(width: 68, height: 68)
-
-                    Image(systemName: appState.inputMode == .scan ? "camera.viewfinder" : "ruler")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(workflowTone == .success ? Color.green : Color.blue)
-                }
+                CoverCraftStatusChip(
+                    appVersionLabel,
+                    systemImage: "number",
+                    tone: .neutral
+                )
+                .accessibilityIdentifier("covercraft.versionBadge")
+                .accessibilityLabel(appVersionAccessibilityLabel)
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Next: \(nextActionTitle)")
+                    .font(.title2.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(nextActionSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            WorkflowProgressRail(steps: workflowProgressSteps)
+
+            primaryWorkflowActionControl
 
             LazyVGrid(columns: metricColumns, spacing: 12) {
                 CoverCraftMetricTile(
@@ -317,11 +445,90 @@ public struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var primaryWorkflowActionControl: some View {
+        if hasFreshGeneratedPattern, let flattenedPanels = appState.flattenedPanels, !flattenedPanels.isEmpty {
+            NavigationLink {
+                ExportView(flattenedPanels: flattenedPanels)
+            } label: {
+                Label("Export Pattern", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.heroExportPatternLink")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else if canGenerateCurrentWorkflow {
+            Button(action: generatePattern) {
+                if isGeneratingPattern {
+                    HStack {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                        Text("Generating...")
+                            .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    Label("Generate Pattern", systemImage: "scissors")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .accessibilityIdentifier("covercraft.heroGeneratePatternButton")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+            .disabled(isGeneratingPattern)
+        } else if appState.inputMode == .scan, appState.currentMesh == nil {
+            Button(action: { showingScanner = true }) {
+                Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.heroStartScanButton")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else if appState.inputMode == .scan, let mesh = appState.currentMesh, !appState.hasProcessedMesh {
+            NavigationLink {
+                MeshProcessingView(
+                    mesh: mesh,
+                    processedMesh: $appState.processedMesh,
+                    options: $appState.processingOptions
+                )
+            } label: {
+                Label("Open Cleanup", systemImage: "crop")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.heroCleanupLink")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else if appState.inputMode == .scan, let effectiveMesh = appState.effectiveMesh, !appState.calibrationData.isComplete {
+            NavigationLink {
+                CalibrationView(
+                    mesh: effectiveMesh,
+                    calibrationData: $appState.calibrationData
+                )
+            } label: {
+                Label("Set Scale", systemImage: "ruler")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.heroCalibrationLink")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else {
+            CoverCraftStatusChip(
+                "Use the controls below to finish required inputs",
+                systemImage: "arrow.down.circle",
+                tone: .neutral
+            )
+        }
+    }
+
     private var inputCard: some View {
         CoverCraftCard(tone: appState.inputMode == .scan ? .accent : .neutral) {
             CoverCraftSectionHeading(
                 step: "Step 1",
-                title: "Choose Input",
+                title: "Input Source",
                 subtitle: "Scan for organic geometry or type fixed measurements for rectangular furniture.",
                 statusTitle: appState.inputMode == .scan ? "Scan flow" : "Manual flow",
                 statusImage: appState.inputMode == .scan ? "camera.viewfinder" : "keyboard",
@@ -450,8 +657,8 @@ public struct ContentView: View {
     private var meshCleanupCard: some View {
         CoverCraftCard(tone: appState.hasProcessedMesh ? .success : .warning) {
             CoverCraftSectionHeading(
-                step: "Step 1b",
-                title: "Isolate Target Mesh",
+                step: "Step 2",
+                title: "Review and Crop Target",
                 subtitle: "Recommended for LiDAR scans because raw scene reconstruction often includes floor, wall, and background geometry.",
                 statusTitle: appState.hasProcessedMesh ? "Processed" : "Recommended",
                 statusImage: appState.hasProcessedMesh ? "checkmark.circle.fill" : "wand.and.stars",
@@ -524,7 +731,7 @@ public struct ContentView: View {
     private var calibrationCard: some View {
         CoverCraftCard(tone: appState.calibrationData.isComplete ? .success : .neutral) {
             CoverCraftSectionHeading(
-                step: "Step 2",
+                step: "Step 3",
                 title: "Set Real-World Scale",
                 subtitle: "Scale the mesh with one measured reference so pattern dimensions stay usable in fabric.",
                 statusTitle: appState.inputMode == .manual ? "Skipped" : (appState.calibrationData.isComplete ? "Scaled" : "Required"),
@@ -580,7 +787,7 @@ public struct ContentView: View {
     private var patternConfigurationCard: some View {
         CoverCraftCard(tone: appState.patternMode == .slipcover ? .accent : .warning) {
             CoverCraftSectionHeading(
-                step: "Step 3",
+                step: patternConfigurationStepLabel,
                 title: "Configure Panels",
                 subtitle: "Choose the stable slipcover path or the experimental fitted path, then tune the output.",
                 statusTitle: appState.patternMode == .slipcover ? "Stable" : "Experimental",
@@ -669,66 +876,94 @@ public struct ContentView: View {
             }
             .pickerStyle(.segmented)
 
-            ValueSliderCard(
-                title: "Ease",
-                valueLabel: "\(Int(appState.slipcoverEaseMillimeters)) mm",
-                systemImage: "arrow.up.left.and.arrow.down.right",
-                tone: .accent,
-                slider: AnyView(
-                    Slider(value: $appState.slipcoverEaseMillimeters, in: 0...200, step: 5)
-                        .tint(.blue)
-                ),
-                footnote: "Extra room added around the object before panel generation."
+            DisclosureGroup(isExpanded: $showAdvancedPatternSettings) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ValueSliderCard(
+                        title: "Ease",
+                        valueLabel: "\(Int(appState.slipcoverEaseMillimeters)) mm",
+                        systemImage: "arrow.up.left.and.arrow.down.right",
+                        tone: .accent,
+                        slider: AnyView(
+                            Slider(value: $appState.slipcoverEaseMillimeters, in: 0...200, step: 5)
+                                .tint(.blue)
+                        ),
+                        footnote: "Extra room added around the object before panel generation."
+                    )
+
+                    ValueSliderCard(
+                        title: "Seam Allowance",
+                        valueLabel: "\(Int(appState.slipcoverSeamAllowanceMillimeters)) mm",
+                        systemImage: "scissors",
+                        tone: .accent,
+                        slider: AnyView(
+                            Slider(value: $appState.slipcoverSeamAllowanceMillimeters, in: 3...50, step: 1)
+                                .tint(.blue)
+                        ),
+                        footnote: "Fabric edge margin included around each panel."
+                    )
+
+                    HStack(spacing: 12) {
+                        StepperCard(
+                            title: "Segments per side",
+                            value: appState.slipcoverSegmentsPerSide,
+                            systemImage: "square.split.2x2",
+                            tone: .accent
+                        ) {
+                            Stepper(
+                                "Segments per side: \(appState.slipcoverSegmentsPerSide)",
+                                value: $appState.slipcoverSegmentsPerSide,
+                                in: 1...16
+                            )
+                            .labelsHidden()
+                        }
+
+                        StepperCard(
+                            title: "Vertical segments",
+                            value: appState.slipcoverVerticalSegments,
+                            systemImage: "rectangle.split.3x1",
+                            tone: .accent
+                        ) {
+                            Stepper(
+                                "Vertical segments: \(appState.slipcoverVerticalSegments)",
+                                value: $appState.slipcoverVerticalSegments,
+                                in: 1...16
+                            )
+                            .labelsHidden()
+                        }
+                    }
+
+                    Picker("Panels", selection: $appState.slipcoverPanelization) {
+                        ForEach(SlipcoverPanelization.allCases, id: \.self) { panelization in
+                            Text(panelization.rawValue).tag(panelization)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .padding(.top, 8)
+            } label: {
+                Label("Advanced fit and seam settings", systemImage: "slider.horizontal.3")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.45))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
             )
 
-            ValueSliderCard(
-                title: "Seam Allowance",
-                valueLabel: "\(Int(appState.slipcoverSeamAllowanceMillimeters)) mm",
-                systemImage: "scissors",
-                tone: .accent,
-                slider: AnyView(
-                    Slider(value: $appState.slipcoverSeamAllowanceMillimeters, in: 3...50, step: 1)
-                        .tint(.blue)
-                ),
-                footnote: "Fabric edge margin included around each panel."
-            )
-
-            HStack(spacing: 12) {
-                StepperCard(
-                    title: "Segments per side",
-                    value: appState.slipcoverSegmentsPerSide,
-                    systemImage: "square.split.2x2",
-                    tone: .accent
-                ) {
-                    Stepper(
-                        "Segments per side: \(appState.slipcoverSegmentsPerSide)",
-                        value: $appState.slipcoverSegmentsPerSide,
-                        in: 1...16
-                    )
-                    .labelsHidden()
-                }
-
-                StepperCard(
-                    title: "Vertical segments",
-                    value: appState.slipcoverVerticalSegments,
-                    systemImage: "rectangle.split.3x1",
-                    tone: .accent
-                ) {
-                    Stepper(
-                        "Vertical segments: \(appState.slipcoverVerticalSegments)",
-                        value: $appState.slipcoverVerticalSegments,
-                        in: 1...16
-                    )
-                    .labelsHidden()
+            if !showAdvancedPatternSettings {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text("Using defaults: \(Int(appState.slipcoverEaseMillimeters)) mm ease, \(Int(appState.slipcoverSeamAllowanceMillimeters)) mm seam allowance.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            Picker("Panels", selection: $appState.slipcoverPanelization) {
-                ForEach(SlipcoverPanelization.allCases, id: \.self) { panelization in
-                    Text(panelization.rawValue).tag(panelization)
-                }
-            }
-            .pickerStyle(.segmented)
 
             Text("Slipcover output stays bottom-open and is the most reliable path for production use.")
                 .font(.caption)
@@ -760,56 +995,105 @@ public struct ContentView: View {
                 .opacity(0.35)
 
             CoverCraftCard(tone: hasFreshGeneratedPattern ? .success : workflowTone) {
-                if hasFreshGeneratedPattern, let flattenedPanels = appState.flattenedPanels, !flattenedPanels.isEmpty {
-                    HStack(spacing: 12) {
-                        NavigationLink {
-                            ExportView(flattenedPanels: flattenedPanels)
-                        } label: {
-                            Label("Export", systemImage: "square.and.arrow.up")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .accessibilityIdentifier("covercraft.exportPatternLink")
-                        .buttonStyle(.borderedProminent)
-                        .tint(.blue)
-
-                        Button(action: generatePattern) {
-                            if isGeneratingPattern {
-                                Label("Generating...", systemImage: "hourglass")
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                Label("Regenerate", systemImage: "arrow.clockwise")
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!canGenerateCurrentWorkflow || isGeneratingPattern)
-                    }
-                } else {
-                    Button(action: generatePattern) {
-                        if isGeneratingPattern {
-                            HStack {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                Text("Generating...")
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                            }
-                        } else {
-                            Label("Generate Pattern", systemImage: "scissors")
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .accessibilityIdentifier("covercraft.generatePatternButton")
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(.blue)
-                    .disabled(!canGenerateCurrentWorkflow || isGeneratingPattern)
-                }
+                bottomWorkflowActionControl
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 8)
         }
         .background(.ultraThinMaterial)
+    }
+
+    @ViewBuilder
+    private var bottomWorkflowActionControl: some View {
+        if hasFreshGeneratedPattern, let flattenedPanels = appState.flattenedPanels, !flattenedPanels.isEmpty {
+            HStack(spacing: 12) {
+                NavigationLink {
+                    ExportView(flattenedPanels: flattenedPanels)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("covercraft.exportPatternLink")
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+
+                Button(action: generatePattern) {
+                    if isGeneratingPattern {
+                        Label("Generating...", systemImage: "hourglass")
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Regenerate", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canGenerateCurrentWorkflow || isGeneratingPattern)
+            }
+        } else if canGenerateCurrentWorkflow {
+            Button(action: generatePattern) {
+                if isGeneratingPattern {
+                    HStack {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                        Text("Generating...")
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                } else {
+                    Label("Generate Pattern", systemImage: "scissors")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .accessibilityIdentifier("covercraft.generatePatternButton")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+            .disabled(isGeneratingPattern)
+        } else if appState.inputMode == .scan, appState.currentMesh == nil {
+            Button(action: { showingScanner = true }) {
+                Label("Start LiDAR Scan", systemImage: "camera.viewfinder")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.bottomStartScanButton")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else if appState.inputMode == .scan, let mesh = appState.currentMesh, !appState.hasProcessedMesh {
+            NavigationLink {
+                MeshProcessingView(
+                    mesh: mesh,
+                    processedMesh: $appState.processedMesh,
+                    options: $appState.processingOptions
+                )
+            } label: {
+                Label("Open Cleanup", systemImage: "crop")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.bottomCleanupLink")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else if appState.inputMode == .scan, let effectiveMesh = appState.effectiveMesh, !appState.calibrationData.isComplete {
+            NavigationLink {
+                CalibrationView(
+                    mesh: effectiveMesh,
+                    calibrationData: $appState.calibrationData
+                )
+            } label: {
+                Label("Set Scale", systemImage: "ruler")
+                    .frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("covercraft.bottomCalibrationLink")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.blue)
+        } else {
+            CoverCraftStatusChip(
+                nextActionTitle,
+                systemImage: "arrow.up.circle",
+                tone: workflowTone
+            )
+        }
     }
 
     private func generatePattern() {
@@ -917,6 +1201,15 @@ public struct ContentView: View {
         lastGeneratedConfiguration = nil
     }
 
+    private func resetScanDependentStateIfNeeded(oldID: UUID?, newID: UUID?) {
+        guard oldID != newID else { return }
+
+        appState.processedMesh = nil
+        appState.calibrationData = CalibrationDTO.empty()
+        appState.output.clearOutput()
+        lastGeneratedConfiguration = nil
+    }
+
     private func updateManualConfirmation(_ field: ManualDimensionField, isValid: Bool) {
         if isValid {
             confirmedManualFields.insert(field)
@@ -1004,6 +1297,103 @@ private struct WorkflowConfiguration: Equatable {
     let slipcoverVerticalSegments: Int
     let slipcoverPanelization: SlipcoverPanelization
     let selectedResolution: SegmentationResolution
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct WorkflowProgressStep: Identifiable {
+    let title: String
+    let subtitle: String
+    let state: WorkflowProgressState
+
+    var id: String { title }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private enum WorkflowProgressState {
+    case complete
+    case active
+    case locked
+
+    var systemImage: String {
+        switch self {
+        case .complete:
+            return "checkmark.circle.fill"
+        case .active:
+            return "circle.circle.fill"
+        case .locked:
+            return "lock.circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .complete:
+            return Color(red: 0.16, green: 0.60, blue: 0.35)
+        case .active:
+            return Color(red: 0.06, green: 0.44, blue: 0.79)
+        case .locked:
+            return Color(red: 0.46, green: 0.50, blue: 0.56)
+        }
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct WorkflowProgressRail: View {
+    let steps: [WorkflowProgressStep]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                    WorkflowProgressNode(step: step)
+
+                    if index < steps.count - 1 {
+                        Capsule(style: .continuous)
+                            .fill(step.state == .complete ? WorkflowProgressState.complete.color.opacity(0.55) : Color.black.opacity(0.10))
+                            .frame(maxWidth: .infinity, minHeight: 3, maxHeight: 3)
+                    }
+                }
+            }
+
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(steps) { step in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Text(step.subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.48))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct WorkflowProgressNode: View {
+    let step: WorkflowProgressStep
+
+    var body: some View {
+        Image(systemName: step.state.systemImage)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(step.state.color)
+            .accessibilityLabel("\(step.title): \(step.subtitle)")
+    }
 }
 
 @available(iOS 18.0, macOS 15.0, *)

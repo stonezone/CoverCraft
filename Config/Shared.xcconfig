@@ -9,8 +9,8 @@
 PRODUCT_NAME = CoverCraft
 PRODUCT_DISPLAY_NAME = CoverCraft
 PRODUCT_BUNDLE_IDENTIFIER = com.covercraft
-MARKETING_VERSION = 1.0
-CURRENT_PROJECT_VERSION = 1
+MARKETING_VERSION = 1.1
+CURRENT_PROJECT_VERSION = 2
 
 // ==========================================
 // Platform Configuration

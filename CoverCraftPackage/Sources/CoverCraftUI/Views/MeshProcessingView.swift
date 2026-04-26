@@ -293,33 +293,46 @@ public struct MeshProcessingView: View {
             CoverCraftSectionHeading(
                 step: "Apply",
                 title: "Apply Isolation",
-                subtitle: "Apply the selected mesh fixes, then use the processed object mesh for review, calibration, and generation.",
+                subtitle: hasAnyOptionEnabled ? "Apply the selected mesh fixes, then use the processed object mesh for review, calibration, and generation." : "Start with the recommended cleanup preset, then adjust individual controls only if the preview still includes background geometry.",
                 tone: hasAnyOptionEnabled ? .accent : .neutral
             )
 
-            Button(action: processNow) {
-                if isProcessing {
-                    HStack {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                        Text("Processing...")
+            if hasAnyOptionEnabled {
+                Button(action: processNow) {
+                    if isProcessing {
+                        HStack {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                            Text("Processing...")
+                                .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        Label("Apply Processing", systemImage: "sparkles")
                             .frame(maxWidth: .infinity)
                     }
-                } else {
-                    Label("Apply Processing", systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.blue)
+                .disabled(isProcessing)
+            } else {
+                Button {
+                    options = .recommended()
+                } label: {
+                    Label("Use Recommended Cleanup", systemImage: "wand.and.stars")
                         .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.blue)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(.blue)
-            .disabled(isProcessing || !hasAnyOptionEnabled)
 
             HStack(spacing: 12) {
                 Button("Use Recommended") {
                     options = .recommended()
                 }
                 .buttonStyle(.bordered)
+                .disabled(!hasAnyOptionEnabled)
 
                 Button("Reset All") {
                     options = .disabled()
