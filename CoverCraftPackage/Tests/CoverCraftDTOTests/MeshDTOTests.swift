@@ -73,4 +73,79 @@ struct MeshDTOTests {
         #expect(bbox?.min == SIMD3<Float>(-1, -2, -3))
         #expect(bbox?.max == SIMD3<Float>(4, 5, 6))
     }
+
+    @Test("Bounds cropping removes triangles outside normalized crop box")
+    func boundsCroppingRemovesOutsideTriangles() {
+        let mesh = MeshDTO(
+            vertices: [
+                SIMD3<Float>(0, 0, 0),
+                SIMD3<Float>(0, 1, 0),
+                SIMD3<Float>(0, 0, 1),
+                SIMD3<Float>(10, 0, 0),
+                SIMD3<Float>(10, 1, 0),
+                SIMD3<Float>(10, 0, 1)
+            ],
+            triangleIndices: [0, 1, 2, 3, 4, 5]
+        )
+
+        let (croppedMesh, removedTriangles) = mesh.cropByBounds(
+            NormalizedCropBounds(maxX: 0.5)
+        )
+
+        #expect(croppedMesh.triangleCount == 1)
+        #expect(croppedMesh.vertices.count == 3)
+        #expect(removedTriangles == 1)
+        #expect(croppedMesh.boundingBox()?.max.x == 0)
+    }
+
+    @Test("Processed mesh reports bounds crop removals")
+    func processedMeshReportsBoundsCropRemovals() {
+        let mesh = MeshDTO(
+            vertices: [
+                SIMD3<Float>(0, 0, 0),
+                SIMD3<Float>(0, 1, 0),
+                SIMD3<Float>(0, 0, 1),
+                SIMD3<Float>(10, 0, 0),
+                SIMD3<Float>(10, 1, 0),
+                SIMD3<Float>(10, 0, 1)
+            ],
+            triangleIndices: [0, 1, 2, 3, 4, 5]
+        )
+
+        let result = mesh.processed(
+            with: MeshProcessingOptions(
+                enableBoundsCropping: true,
+                cropBounds: NormalizedCropBounds(maxX: 0.5)
+            )
+        )
+
+        #expect(result.mesh.triangleCount == 1)
+        #expect(result.boundsCroppedTriangles == 1)
+        #expect(result.summary.contains("outside-trim"))
+        #expect(result.originalTriangleCount == 2)
+        #expect(result.finalTriangleCount == 1)
+    }
+
+    @Test("Plane cropping clamps programmatic height fraction")
+    func planeCroppingClampsProgrammaticHeightFraction() {
+        let mesh = MeshDTO(
+            vertices: [
+                SIMD3<Float>(0, 0, 0),
+                SIMD3<Float>(1, 0, 0),
+                SIMD3<Float>(0, 0, 1),
+                SIMD3<Float>(0, 10, 0),
+                SIMD3<Float>(1, 10, 0),
+                SIMD3<Float>(0, 10, 1)
+            ],
+            triangleIndices: [0, 1, 2, 3, 4, 5]
+        )
+
+        let (belowMesh, belowRemoved) = mesh.cropByPlane(heightFraction: -0.5, direction: .below)
+        let (aboveMesh, aboveRemoved) = mesh.cropByPlane(heightFraction: 1.5, direction: .above)
+
+        #expect(belowMesh.triangleCount == 2)
+        #expect(belowRemoved == 0)
+        #expect(aboveMesh.triangleCount == 2)
+        #expect(aboveRemoved == 0)
+    }
 }

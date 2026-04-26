@@ -30,6 +30,7 @@ public struct MeshProcessingView: View {
                 meshSummaryCard
                 holeFillingCard
                 planeCroppingCard
+                boundsCroppingCard
                 fragmentRemovalCard
                 actionCard
 
@@ -230,6 +231,63 @@ public struct MeshProcessingView: View {
         }
     }
 
+    private var boundsCroppingCard: some View {
+        CoverCraftCard(tone: options.enableBoundsCropping ? .accent : .neutral) {
+            CleanupToggleHeader(
+                title: "Trim to Object Box",
+                subtitle: "Remove side, front, back, or top geometry that belongs to the room instead of the object.",
+                systemImage: "crop",
+                isEnabled: $options.enableBoundsCropping,
+                tone: options.enableBoundsCropping ? .accent : .neutral
+            )
+
+            if options.enableBoundsCropping {
+                VStack(alignment: .leading, spacing: 12) {
+                    CoverCraftStatusChip(
+                        "Keeps triangle centers inside the selected box",
+                        systemImage: "cube.transparent",
+                        tone: .neutral
+                    )
+
+                    CropRangeSliderPanel(
+                        title: "Width crop",
+                        minLabel: "Left \(percentLabel(options.cropBounds.minX))",
+                        maxLabel: "Right \(percentLabel(options.cropBounds.maxX))",
+                        footnote: "Raise Left or lower Right to remove side clutter.",
+                        minValue: cropMinXBinding,
+                        maxValue: cropMaxXBinding,
+                        tint: .blue
+                    )
+
+                    CropRangeSliderPanel(
+                        title: "Height crop",
+                        minLabel: "Bottom \(percentLabel(options.cropBounds.minY))",
+                        maxLabel: "Top \(percentLabel(options.cropBounds.maxY))",
+                        footnote: "Raise Bottom when the table or floor is still attached.",
+                        minValue: cropMinYBinding,
+                        maxValue: cropMaxYBinding,
+                        tint: .orange
+                    )
+
+                    CropRangeSliderPanel(
+                        title: "Depth crop",
+                        minLabel: "Front \(percentLabel(options.cropBounds.minZ))",
+                        maxLabel: "Back \(percentLabel(options.cropBounds.maxZ))",
+                        footnote: "Use this when LiDAR captured background behind the target.",
+                        minValue: cropMinZBinding,
+                        maxValue: cropMaxZBinding,
+                        tint: .blue
+                    )
+
+                    Button("Reset Crop Box") {
+                        options.cropBounds = .full
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+
     private var actionCard: some View {
         CoverCraftCard(tone: hasAnyOptionEnabled ? .accent : .neutral) {
             CoverCraftSectionHeading(
@@ -274,18 +332,20 @@ public struct MeshProcessingView: View {
     }
 
     private var hasAnyOptionEnabled: Bool {
-        options.enableHoleFilling || options.enablePlaneCropping || options.enableComponentIsolation
+        options.enableHoleFilling || options.enablePlaneCropping || options.enableBoundsCropping || options.enableComponentIsolation
     }
 
     private func resultCard(_ result: MeshProcessingResult) -> some View {
-        CoverCraftCard(tone: .success) {
+        let isUsable = result.mesh.isValid
+
+        return CoverCraftCard(tone: isUsable ? .success : .warning) {
             CoverCraftSectionHeading(
                 step: "Done",
-                title: "Processing Complete",
-                subtitle: "The cleaned mesh is now the active source for calibration and generation.",
-                statusTitle: "Updated",
-                statusImage: "checkmark.circle.fill",
-                tone: .success
+                title: isUsable ? "Processing Complete" : "Processing Removed Mesh",
+                subtitle: isUsable ? "The cleaned mesh is now the active source for calibration and generation." : "The selected crop removed all usable triangles. Loosen the crop bounds and apply again.",
+                statusTitle: isUsable ? "Updated" : "Not Applied",
+                statusImage: isUsable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                tone: isUsable ? .success : .warning
             )
 
             LazyVGrid(
@@ -306,8 +366,8 @@ public struct MeshProcessingView: View {
                     title: "After",
                     value: "\(result.finalTriangleCount)",
                     subtitle: "Triangles",
-                    systemImage: "checkmark.circle.fill",
-                    tone: .success
+                    systemImage: isUsable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                    tone: isUsable ? .success : .warning
                 )
             }
 
@@ -315,11 +375,13 @@ public struct MeshProcessingView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Button("Done") {
-                dismiss()
+            Button(isUsable ? "Done" : "Keep Editing") {
+                if isUsable {
+                    dismiss()
+                }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(isUsable ? .green : .orange)
         }
     }
 
@@ -334,11 +396,94 @@ public struct MeshProcessingView: View {
 
             await MainActor.run {
                 lastResult = result
-                processedMesh = result.mesh
-                previewBoundaryInfo = result.mesh.analyzeBoundaries()
+                processedMesh = result.mesh.isValid ? result.mesh : nil
+                previewBoundaryInfo = result.mesh.isValid ? result.mesh.analyzeBoundaries() : meshToProcess.analyzeBoundaries()
                 isProcessing = false
             }
         }
+    }
+
+    private var cropMinXBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.minX },
+            set: { updateCropBounds(minX: $0) }
+        )
+    }
+
+    private var cropMaxXBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.maxX },
+            set: { updateCropBounds(maxX: $0) }
+        )
+    }
+
+    private var cropMinYBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.minY },
+            set: { updateCropBounds(minY: $0) }
+        )
+    }
+
+    private var cropMaxYBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.maxY },
+            set: { updateCropBounds(maxY: $0) }
+        )
+    }
+
+    private var cropMinZBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.minZ },
+            set: { updateCropBounds(minZ: $0) }
+        )
+    }
+
+    private var cropMaxZBinding: Binding<Float> {
+        Binding(
+            get: { options.cropBounds.maxZ },
+            set: { updateCropBounds(maxZ: $0) }
+        )
+    }
+
+    private func updateCropBounds(
+        minX: Float? = nil,
+        maxX: Float? = nil,
+        minY: Float? = nil,
+        maxY: Float? = nil,
+        minZ: Float? = nil,
+        maxZ: Float? = nil
+    ) {
+        let minimumSpan: Float = 0.02
+        var cropBounds = options.cropBounds
+
+        if let minX {
+            cropBounds.minX = min(Self.clamp(minX), max(0, cropBounds.maxX - minimumSpan))
+        }
+        if let maxX {
+            cropBounds.maxX = max(Self.clamp(maxX), min(1, cropBounds.minX + minimumSpan))
+        }
+        if let minY {
+            cropBounds.minY = min(Self.clamp(minY), max(0, cropBounds.maxY - minimumSpan))
+        }
+        if let maxY {
+            cropBounds.maxY = max(Self.clamp(maxY), min(1, cropBounds.minY + minimumSpan))
+        }
+        if let minZ {
+            cropBounds.minZ = min(Self.clamp(minZ), max(0, cropBounds.maxZ - minimumSpan))
+        }
+        if let maxZ {
+            cropBounds.maxZ = max(Self.clamp(maxZ), min(1, cropBounds.minZ + minimumSpan))
+        }
+
+        options.cropBounds = cropBounds.normalized
+    }
+
+    private func percentLabel(_ value: Float) -> String {
+        "\(Int((value * 100).rounded()))%"
+    }
+
+    private static func clamp(_ value: Float) -> Float {
+        min(max(value, 0), 1)
     }
 }
 
@@ -393,6 +538,52 @@ private struct ValueSliderPanel<Content: View>: View {
             }
 
             content()
+
+            Text(footnote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.45))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+private struct CropRangeSliderPanel: View {
+    let title: String
+    let minLabel: String
+    let maxLabel: String
+    let footnote: String
+    @Binding var minValue: Float
+    @Binding var maxValue: Float
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Text("\(minLabel) / \(maxLabel)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 8) {
+                Slider(value: $minValue, in: 0...1, step: 0.01)
+                    .tint(tint)
+                Slider(value: $maxValue, in: 0...1, step: 0.01)
+                    .tint(tint)
+            }
 
             Text(footnote)
                 .font(.caption)

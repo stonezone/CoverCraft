@@ -2,6 +2,7 @@
 // CoverCraft DTO Module - Mesh Processing Configuration
 
 import Foundation
+import simd
 
 /// Configuration options for mesh cleanup and processing
 @available(iOS 18.0, macOS 15.0, *)
@@ -29,6 +30,14 @@ public struct MeshProcessingOptions: Sendable, Codable, Equatable {
     /// Which direction to crop: .below removes floor, .above removes ceiling
     public var cropDirection: CropDirection
 
+    // MARK: - Bounds Cropping
+
+    /// Whether to crop geometry outside a normalized axis-aligned bounds box
+    public var enableBoundsCropping: Bool
+
+    /// Normalized crop bounds mapped over the mesh bounding box
+    public var cropBounds: NormalizedCropBounds
+
     // MARK: - Connected Components
 
     /// Whether to isolate the largest connected component (removes disconnected fragments)
@@ -46,6 +55,8 @@ public struct MeshProcessingOptions: Sendable, Codable, Equatable {
         enablePlaneCropping: Bool = false,
         cropPlaneHeightFraction: Float = 0.05,
         cropDirection: CropDirection = .below,
+        enableBoundsCropping: Bool = false,
+        cropBounds: NormalizedCropBounds = .full,
         enableComponentIsolation: Bool = false,
         minComponentTriangles: Int = 100
     ) {
@@ -54,6 +65,8 @@ public struct MeshProcessingOptions: Sendable, Codable, Equatable {
         self.enablePlaneCropping = enablePlaneCropping
         self.cropPlaneHeightFraction = cropPlaneHeightFraction
         self.cropDirection = cropDirection
+        self.enableBoundsCropping = enableBoundsCropping
+        self.cropBounds = cropBounds.normalized
         self.enableComponentIsolation = enableComponentIsolation
         self.minComponentTriangles = minComponentTriangles
     }
@@ -71,9 +84,96 @@ public struct MeshProcessingOptions: Sendable, Codable, Equatable {
             enablePlaneCropping: true,
             cropPlaneHeightFraction: 0.05,
             cropDirection: .below,
+            enableBoundsCropping: false,
             enableComponentIsolation: true,
             minComponentTriangles: 100
         )
+    }
+}
+
+/// Normalized axis-aligned crop box for mesh isolation.
+///
+/// Values are fractions across the mesh bounding box. A full range keeps all geometry.
+@available(iOS 18.0, macOS 15.0, *)
+public struct NormalizedCropBounds: Sendable, Codable, Equatable {
+    public var minX: Float
+    public var maxX: Float
+    public var minY: Float
+    public var maxY: Float
+    public var minZ: Float
+    public var maxZ: Float
+
+    public init(
+        minX: Float = 0,
+        maxX: Float = 1,
+        minY: Float = 0,
+        maxY: Float = 1,
+        minZ: Float = 0,
+        maxZ: Float = 1
+    ) {
+        let clampedMinX = Self.clamp(minX)
+        let clampedMaxX = Self.clamp(maxX)
+        let clampedMinY = Self.clamp(minY)
+        let clampedMaxY = Self.clamp(maxY)
+        let clampedMinZ = Self.clamp(minZ)
+        let clampedMaxZ = Self.clamp(maxZ)
+
+        self.minX = min(clampedMinX, clampedMaxX)
+        self.maxX = max(clampedMinX, clampedMaxX)
+        self.minY = min(clampedMinY, clampedMaxY)
+        self.maxY = max(clampedMinY, clampedMaxY)
+        self.minZ = min(clampedMinZ, clampedMaxZ)
+        self.maxZ = max(clampedMinZ, clampedMaxZ)
+    }
+
+    public static let full = NormalizedCropBounds()
+
+    public var normalized: NormalizedCropBounds {
+        NormalizedCropBounds(
+            minX: minX,
+            maxX: maxX,
+            minY: minY,
+            maxY: maxY,
+            minZ: minZ,
+            maxZ: maxZ
+        )
+    }
+
+    public var isFullRange: Bool {
+        minX == 0 && maxX == 1 &&
+        minY == 0 && maxY == 1 &&
+        minZ == 0 && maxZ == 1
+    }
+
+    func contains(
+        _ point: SIMD3<Float>,
+        in bounds: (min: SIMD3<Float>, max: SIMD3<Float>)
+    ) -> Bool {
+        let normalizedPoint = normalizedPoint(point, in: bounds)
+        return normalizedPoint.x >= minX && normalizedPoint.x <= maxX &&
+        normalizedPoint.y >= minY && normalizedPoint.y <= maxY &&
+        normalizedPoint.z >= minZ && normalizedPoint.z <= maxZ
+    }
+
+    private func normalizedPoint(
+        _ point: SIMD3<Float>,
+        in bounds: (min: SIMD3<Float>, max: SIMD3<Float>)
+    ) -> SIMD3<Float> {
+        let size = bounds.max - bounds.min
+        return SIMD3<Float>(
+            Self.normalize(point.x, origin: bounds.min.x, size: size.x),
+            Self.normalize(point.y, origin: bounds.min.y, size: size.y),
+            Self.normalize(point.z, origin: bounds.min.z, size: size.z)
+        )
+    }
+
+    private static func clamp(_ value: Float) -> Float {
+        min(max(value, 0), 1)
+    }
+
+    private static func normalize(_ value: Float, origin: Float, size: Float) -> Float {
+        guard abs(size) > .ulpOfOne else { return 0.5 }
+        return clamp((value - origin) / size)
     }
 }
 
@@ -97,6 +197,9 @@ public struct MeshProcessingResult: Sendable {
     /// Number of triangles removed by plane cropping
     public let trianglesCropped: Int
 
+    /// Number of triangles removed by bounds cropping
+    public let boundsCroppedTriangles: Int
+
     /// Number of disconnected components removed
     public let componentsRemoved: Int
 
@@ -110,6 +213,7 @@ public struct MeshProcessingResult: Sendable {
         mesh: MeshDTO,
         holesFilled: Int = 0,
         trianglesCropped: Int = 0,
+        boundsCroppedTriangles: Int = 0,
         componentsRemoved: Int = 0,
         originalTriangleCount: Int = 0,
         finalTriangleCount: Int = 0
@@ -117,6 +221,7 @@ public struct MeshProcessingResult: Sendable {
         self.mesh = mesh
         self.holesFilled = holesFilled
         self.trianglesCropped = trianglesCropped
+        self.boundsCroppedTriangles = boundsCroppedTriangles
         self.componentsRemoved = componentsRemoved
         self.originalTriangleCount = originalTriangleCount
         self.finalTriangleCount = finalTriangleCount
@@ -130,6 +235,9 @@ public struct MeshProcessingResult: Sendable {
         }
         if trianglesCropped > 0 {
             parts.append("\(trianglesCropped) triangles cropped")
+        }
+        if boundsCroppedTriangles > 0 {
+            parts.append("\(boundsCroppedTriangles) outside-trim triangle\(boundsCroppedTriangles == 1 ? "" : "s") removed")
         }
         if componentsRemoved > 0 {
             parts.append("\(componentsRemoved) fragment\(componentsRemoved == 1 ? "" : "s") removed")

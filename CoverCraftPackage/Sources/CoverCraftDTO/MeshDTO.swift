@@ -308,6 +308,7 @@ public extension MeshDTO {
         var currentMesh = self
         var holesFilled = 0
         var trianglesCropped = 0
+        var boundsCroppedTriangles = 0
         var componentsRemoved = 0
         let originalCount = triangleCount
 
@@ -330,7 +331,14 @@ public extension MeshDTO {
             trianglesCropped = cropped
         }
 
-        // Step 3: Hole filling
+        // Step 3: Bounds cropping
+        if options.enableBoundsCropping {
+            let (croppedMesh, cropped) = currentMesh.cropByBounds(options.cropBounds)
+            currentMesh = croppedMesh
+            boundsCroppedTriangles = cropped
+        }
+
+        // Step 4: Hole filling
         if options.enableHoleFilling {
             let (filledMesh, filled) = currentMesh.fillSmallHoles(
                 maxEdges: options.maxHoleEdges
@@ -343,6 +351,7 @@ public extension MeshDTO {
             mesh: currentMesh,
             holesFilled: holesFilled,
             trianglesCropped: trianglesCropped,
+            boundsCroppedTriangles: boundsCroppedTriangles,
             componentsRemoved: componentsRemoved,
             originalTriangleCount: originalCount,
             finalTriangleCount: currentMesh.triangleCount
@@ -425,6 +434,36 @@ public extension MeshDTO {
         return (newMesh, removed)
     }
 
+    // MARK: - Bounds Cropping
+
+    /// Crop triangles outside normalized axis-aligned bounds.
+    /// - Parameter cropBounds: Normalized bounds mapped over the current mesh bounding box
+    /// - Returns: Tuple of (cropped mesh, number of triangles removed)
+    func cropByBounds(_ cropBounds: NormalizedCropBounds) -> (MeshDTO, Int) {
+        let normalizedBounds = cropBounds.normalized
+        guard !normalizedBounds.isFullRange,
+              let bounds = boundingBox()
+        else { return (self, 0) }
+
+        var trianglesToKeep = Set<Int>()
+
+        for triIdx in 0..<triangleCount {
+            let baseIdx = triIdx * 3
+            let v0 = vertices[triangleIndices[baseIdx]]
+            let v1 = vertices[triangleIndices[baseIdx + 1]]
+            let v2 = vertices[triangleIndices[baseIdx + 2]]
+            let centroid = (v0 + v1 + v2) / 3.0
+
+            if normalizedBounds.contains(centroid, in: bounds) {
+                trianglesToKeep.insert(triIdx)
+            }
+        }
+
+        let (newMesh, _) = buildMeshFromTriangles(trianglesToKeep)
+        let removed = triangleCount - newMesh.triangleCount
+        return (newMesh, removed)
+    }
+
     // MARK: - Plane-Based Cropping
 
     /// Crop triangles below/above a horizontal plane
@@ -435,8 +474,9 @@ public extension MeshDTO {
     func cropByPlane(heightFraction: Float, direction: CropDirection) -> (MeshDTO, Int) {
         guard let bounds = boundingBox() else { return (self, 0) }
 
+        let clampedHeightFraction = min(max(heightFraction, 0), 1)
         let meshHeight = bounds.max.y - bounds.min.y
-        let planeY = bounds.min.y + (meshHeight * heightFraction)
+        let planeY = bounds.min.y + (meshHeight * clampedHeightFraction)
 
         var trianglesToKeep = Set<Int>()
 

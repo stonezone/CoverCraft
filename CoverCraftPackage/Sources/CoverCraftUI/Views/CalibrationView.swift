@@ -8,6 +8,7 @@ import UIKit
 #endif
 
 enum CalibrationMethod: String, CaseIterable, Identifiable {
+    case pointToPoint = "Tap-to-Tap Points"
     case diagonal = "Bounding Box Diagonal"
     case xAxis = "X-Axis (Width)"
     case yAxis = "Y-Axis (Height)"
@@ -18,6 +19,7 @@ enum CalibrationMethod: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .pointToPoint: return "hand.tap"
         case .diagonal: return "cube.transparent"
         case .xAxis: return "arrow.left.and.right"
         case .yAxis: return "arrow.up.and.down"
@@ -28,6 +30,7 @@ enum CalibrationMethod: String, CaseIterable, Identifiable {
 
     var shortLabel: String {
         switch self {
+        case .pointToPoint: return "Tap-to-Tap"
         case .diagonal: return "Diagonal"
         case .xAxis: return "Width"
         case .yAxis: return "Height"
@@ -38,6 +41,7 @@ enum CalibrationMethod: String, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
+        case .pointToPoint: return "Tap two visible points on the mesh"
         case .diagonal: return "Corner to corner reference"
         case .xAxis: return "Left to right extent"
         case .yAxis: return "Bottom to top extent"
@@ -54,8 +58,9 @@ public struct CalibrationView: View {
     @Binding var calibrationData: CalibrationDTO
 
     @State private var realWorldDistanceText = ""
-    @State private var selectedMethod: CalibrationMethod = .longestAxis
+    @State private var selectedMethod: CalibrationMethod = .pointToPoint
     @State private var computedMeshDistance: Float = 0.0
+    @State private var selectedReferencePoints: [SIMD3<Float>] = []
     @Environment(\.dismiss) private var dismiss
 
     public init(mesh: MeshDTO?, calibrationData: Binding<CalibrationDTO>) {
@@ -71,6 +76,9 @@ public struct CalibrationView: View {
                 if let mesh {
                     meshOverviewCard(mesh)
                     methodSelectionCard
+                    if selectedMethod == .pointToPoint {
+                        pointPickerCard(mesh)
+                    }
                     distanceEntryCard
 
                     if calibrationData.isComplete {
@@ -83,7 +91,9 @@ public struct CalibrationView: View {
                 Button("Reset Calibration") {
                     calibrationData = CalibrationDTO.empty()
                     realWorldDistanceText = ""
-                    selectedMethod = .longestAxis
+                    selectedMethod = .pointToPoint
+                    selectedReferencePoints = []
+                    computedMeshDistance = 0
                 }
                 .buttonStyle(.bordered)
                 .disabled(mesh == nil)
@@ -100,6 +110,11 @@ public struct CalibrationView: View {
         .onAppear {
             if calibrationData.isRealWorldDistanceSet && calibrationData.realWorldDistance > 0 {
                 realWorldDistanceText = String(format: "%.2f", calibrationData.realWorldDistance)
+            }
+            if let firstPoint = calibrationData.firstPoint,
+               let secondPoint = calibrationData.secondPoint {
+                selectedReferencePoints = [firstPoint, secondPoint]
+                selectedMethod = .pointToPoint
             }
             updateComputedDistance()
         }
@@ -121,7 +136,7 @@ public struct CalibrationView: View {
                     Text("Calibrate the scan with one visible reference before generating the pattern.")
                         .font(.title3.weight(.semibold))
 
-                    Text("Use the mesh preview and extents below to pick the dimension you can measure most accurately.")
+                    Text("Tap two visible points for the best scale reference, or fall back to bounding-box extents when point picking is not practical.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -206,7 +221,7 @@ public struct CalibrationView: View {
                 }
             }
 
-            Text("Near-term workflow: use the visible longest extent as a guide. Next calibration phase should replace these abstract axes with tap-to-tap points on the mesh preview.")
+            Text("Axis extents are approximate. Tap-to-tap points are preferred when the target has a visible edge, seam, or measured reference mark.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -267,7 +282,31 @@ public struct CalibrationView: View {
                     systemImage: "info.circle.fill",
                     tone: .neutral
                 )
+            } else if selectedMethod == .pointToPoint {
+                CoverCraftStatusChip(
+                    "Tap two mesh points before applying scale",
+                    systemImage: "hand.tap",
+                    tone: .warning
+                )
             }
+        }
+    }
+
+    private func pointPickerCard(_ mesh: MeshDTO) -> some View {
+        CoverCraftCard(tone: selectedReferencePoints.count == 2 ? .success : .accent) {
+            CoverCraftSectionHeading(
+                step: "Step 1A",
+                title: "Mark Reference Points",
+                subtitle: "Tap the two ends of a distance you can measure on the physical object.",
+                statusTitle: selectedReferencePoints.count == 2 ? "Ready" : "Needs 2 points",
+                statusImage: selectedReferencePoints.count == 2 ? "checkmark.circle.fill" : "hand.tap",
+                tone: selectedReferencePoints.count == 2 ? .success : .accent
+            )
+
+            MeshPointPickerView(
+                mesh: mesh,
+                selectedPoints: selectedReferencePointsBinding
+            )
         }
     }
 
@@ -388,6 +427,12 @@ public struct CalibrationView: View {
         let size = bounds.max - bounds.min
 
         switch selectedMethod {
+        case .pointToPoint:
+            guard selectedReferencePoints.count == 2 else {
+                computedMeshDistance = 0
+                return
+            }
+            computedMeshDistance = simd_distance(selectedReferencePoints[0], selectedReferencePoints[1])
         case .diagonal:
             computedMeshDistance = simd_length(size)
         case .xAxis:
@@ -422,6 +467,10 @@ public struct CalibrationView: View {
         let point2: SIMD3<Float>
 
         switch selectedMethod {
+        case .pointToPoint:
+            guard selectedReferencePoints.count == 2 else { return }
+            point1 = selectedReferencePoints[0]
+            point2 = selectedReferencePoints[1]
         case .diagonal:
             point1 = bounds.min
             point2 = bounds.max
@@ -451,6 +500,16 @@ public struct CalibrationView: View {
             firstPoint: point1,
             secondPoint: point2,
             realWorldDistance: distance
+        )
+    }
+
+    private var selectedReferencePointsBinding: Binding<[SIMD3<Float>]> {
+        Binding(
+            get: { selectedReferencePoints },
+            set: { newValue in
+                selectedReferencePoints = Array(newValue.suffix(2))
+                updateComputedDistance()
+            }
         )
     }
 }
